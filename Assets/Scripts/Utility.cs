@@ -61,11 +61,37 @@ public static class Utility {
       return number;
   }
 
+  /// <summary>
+  /// Box a float between 0 and 1
+  /// </summary>
+  /// <param name="number"></param>
+  /// <returns></returns>
   public static float Box01(this float number) {
     return Box(number, 0, 1);
   }
 
+  /// <summary>
+  /// Map values for terrain generation
+  /// </summary>
+  /// <param name="value"></param>
+  /// <param name="x1"></param>
+  /// <param name="y1"></param>
+  /// <param name="x2"></param>
+  /// <param name="y2"></param>
+  /// <returns></returns>
   public static float GenMap(this float value, float x1, float y1, float x2, float y2) {
     return (value - x1) / (y1 - x1) * (y2 - x2) + x2;
+  }
+
+  /// <summary>
+  /// Speedy absolute value function
+  /// </summary>
+  /// <param name="n"></param>
+  /// <returns></returns>
+  public static float Abs(this float n) {
+    if (n < 0)
+      return -n;
+    else
+      return n;
   }
 }

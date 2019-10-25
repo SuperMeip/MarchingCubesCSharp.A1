@@ -2,35 +2,73 @@
 using System.Collections.Generic;
 using Block;
 
+/// <summary>
+/// Generates a collection of block data into a marching cubes mesh
+/// </summary>
 public class MarchRenderer {
+
+  /// <summary>
+  /// Which vertex the renderer is on
+  /// </summary>
   int vertexIndex = 0;
+
+  /// <summary>
+  /// The verticies being generated for the mesh
+  /// </summary>
   List<Vector3> vertices;
+
+  /// <summary>
+  /// The triangles being generated for the mesh
+  /// </summary>
   List<int> triangles;
+
+  /// <summary>
+  /// Used to store block vertexes for each block being marched in the proper location
+  /// </summary>
   Vector3[] blockVertexes;
-  MarchingPointDictionary points;
-  float isoSurfaceLevel = 1.0f;
+
+  /// <summary>
+  /// The block/point data
+  /// </summary>
+  IBlockStorage points;
+
+  /// <summary>
+  /// The level at which a block is determined to be solid
+  /// </summary>
+  float isoSurfaceLevel = 0.5f;
+
+  /// <summary>
+  /// Any deviation from an existing point greater than this will be interpolated, otherwise it will snap to that point
+  /// </summary>
   float clippingLevel = 0.00001f;
 
-  public Mesh generateMesh(MarchingPointDictionary blockData, float? isoSurfaceLevel = null, float? clippingLevel = null) {
+  /// <summary>
+  /// Generate the entire mesh for this collection of block data
+  /// </summary>
+  /// <param name="blockData">The bitmask data for the points and blocks</param>
+  /// <param name="isoSurfaceLevel">an override for the iso surface level</param>
+  /// <param name="clippingLevel">an override for the clipping level/tightness</param>
+  /// <returns></returns>
+  public Mesh generateMesh(IBlockStorage blockData, float? isoSurfaceLevel = null, float? clippingLevel = null) {
     points               = blockData;
     Mesh mesh            = new Mesh();
     triangles            = new List<int>();
     vertices             = new List<Vector3>();
-    // doesn't need to be reset each block??? okay...
     blockVertexes        = new Vector3[12];
     this.isoSurfaceLevel = isoSurfaceLevel == null
-      ? blockData.isoSurfaceLevel
+      ? this.isoSurfaceLevel
       : (float)isoSurfaceLevel;
     this.clippingLevel   = clippingLevel == null
       ? this.clippingLevel
       : (float)clippingLevel;
 
+    // March over each point
     Coordinate.Zero.until(points.bounds, (coordinate) => {
       march(coordinate);
     });
 
+    // set and return the mesh data
     mesh.Clear();
-
     mesh.vertices = vertices.ToArray();
     mesh.SetTriangles(triangles, 0);
     mesh.RecalculateNormals();
@@ -38,18 +76,26 @@ public class MarchRenderer {
     return mesh;
   }
 
+  /// <summary>
+  /// March over the blocks for a single point
+  /// </summary>
+  /// <param name="pointLocation"></param>
   void march(Coordinate pointLocation) {
     // @todo: skip air blocks?
-    byte blockMask                    = points[pointLocation].GetBlockVertexMask();
+    byte blockMask                    = points.getBlock(pointLocation).GetBlockVertexMask();
     int edgeIndex                     = LookupTables.EdgeTable[blockMask];
     int[] blockVertexValues           = new int[8];
     Coordinate[] blockVertexLocations = new Coordinate[8];
 
+    // get all 8 blocks' data for this point
     foreach(Octants.Octant octant in Octants.All) {
       blockVertexLocations[octant.Value] = pointLocation + octant.Offset;
-      blockVertexValues[octant.Value]    = points[blockVertexLocations[octant.Value]];
+      blockVertexValues[octant.Value]    = points.getBlock(blockVertexLocations[octant.Value]);
     }
 
+    // for each edge of the block for just this point
+    //   (the block for this point is the block who's WestBottomSouth most vertex's xyz
+    //     is equal to the point's xyz)
     for (int i = 0; i < 12; i++) {
       // if this blocks isosurface passes through edge i/12 on the box
       if ((edgeIndex & (1 << i)) != 0) {
@@ -66,6 +112,8 @@ public class MarchRenderer {
       }
     }
 
+    // Get the correct row of triangles, and iterate over the vertex data
+    // to store it in the mesh arrays
     int[] row = LookupTables.TriangleTable[blockMask];
 
     for (int i = 0; i < row.Length; i += 3) {
@@ -92,39 +140,30 @@ public class MarchRenderer {
   /// <param name="valueP2"></param>
   /// <returns></returns>
   private Vector3 VertexInterpolate(Vector3 edgePointOne, Vector3 edgePointTwo, float pointScalarOne, float pointScalarTwo) {
-    if (Utils.Abs(isoSurfaceLevel - pointScalarOne) < clippingLevel) {
+    if (Utility.Abs(isoSurfaceLevel - pointScalarOne) < clippingLevel) {
       return edgePointOne;
     }
-    if (Utils.Abs(isoSurfaceLevel - pointScalarTwo) < clippingLevel) {
+    if (Utility.Abs(isoSurfaceLevel - pointScalarTwo) < clippingLevel) {
       return edgePointTwo;
     }
-    if (Utils.Abs(pointScalarOne - pointScalarTwo) < clippingLevel) {
+    if (Utility.Abs(pointScalarOne - pointScalarTwo) < clippingLevel) {
       return edgePointOne;
     }
 
-    //float mu = (isoSurfaceLevel - pointScalarOne) / (pointScalarTwo - pointScalarOne);
-
     float mu = 0.5f;//((isoSurfaceLevel - pointScalarOne) / (pointScalarTwo - pointScalarOne)).Box01();
-
     Vector3 p = edgePointOne + mu * (edgePointTwo - edgePointOne);
 
     return p;
   }
 
-  /*private Vector3 CalculateOffset(int edgeId, Coordinate pointLocation, byte value1, byte value2) {
-    float delta = value2 - value1;
-    float offset = 1;// (delta == 0.0f) ? surface : (surface - value1) / delta;
-
-    var x = pointLocation.x + (Octants.All[LookupTables.EdgeIndexTable[edgeId][0]].Offset.x + offset * LookupTables.EdgeDirection[edgeId].x);
-    var y = pointLocation.y + (Octants.All[LookupTables.EdgeIndexTable[edgeId][0]].Offset.y + offset * LookupTables.EdgeDirection[edgeId].y);
-    var z = pointLocation.z + (Octants.All[LookupTables.EdgeIndexTable[edgeId][0]].Offset.z + offset * LookupTables.EdgeDirection[edgeId].z);
-
-    return new Vector3(
-      x,y,z
-    );
-  }*/
-
+  /// <summary>
+  /// Marching cube lookup data
+  /// </summary>
   static class LookupTables {
+
+    /// <summary>
+    /// The 12 edges of a block in order, defined by the values of the octants of the vertexes they connect
+    /// </summary>
     public static readonly int[][] EdgeIndexTable = {
         new[] {0, 1},
         new[] {1, 2},
@@ -140,6 +179,10 @@ public class MarchRenderer {
         new[] {3, 7}
     };
 
+    /// <summary>
+    /// A table mapping the 8 bit vertex bitmask of a block, to a 12 bit mask of which edges of
+    /// the block the isosurface must pass through for those solid vertexes.
+    /// </summary>
     public static readonly int[] EdgeTable = {
         0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
         0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
@@ -176,15 +219,9 @@ public class MarchRenderer {
     };
 
     /// <summary>
-    /// edgeDirection lists the direction vector (vertex1-vertex0) for each edge in the cube.
-    /// edgeDirection[12][3]
+    /// Triangle values for each valid shape in the marching cubes mesh.
+    /// Indexed by an 8 bit mask of which vertexes of the block are solid, based on octant value
     /// </summary>
-    /*public static readonly Coordinate[] EdgeDirection = new Coordinate[] {
-      (1, 0, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
-      (-1, 0, 0), (0, 1, 0), (-1, 0, 0), (0, -1, 0),
-      (0, 0, 1), (0, 0, 1), ( 0, 0, 1), (0, 0, 1)
-    };*/
-
     public static readonly int[][] TriangleTable = {
         new int[] { },
         new[] {0, 8, 3},
@@ -443,14 +480,5 @@ public class MarchRenderer {
         new[] {0, 3, 8},
         new int[] { }
     };
-  }
-}
-
-public static class Utils {
-  public static float Abs(this float n) {
-    if (n < 0)
-      return -n;
-    else
-      return n;
   }
 }

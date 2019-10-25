@@ -1,6 +1,13 @@
 ﻿public interface IBlockStorage {
 
   /// <summary>
+  /// The itteratable bounds of this collection of blocks, x, y, and z
+  /// </summary>
+  public Coordinate bounds {
+    get;
+  }
+
+  /// <summary>
   /// Get the block data as an int bitmask at the given x,y,z
   /// </summary>
   /// <param name="location">the x,y,z of the block/point data to get</param>
