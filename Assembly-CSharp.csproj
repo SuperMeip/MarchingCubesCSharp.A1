@@ -73,9 +73,9 @@
     <Compile Include="Assets\Scripts\Terrain\Rendering\MarchRenderer.cs" />
     <Compile Include="Assets\Scripts\Terrain\Storage\BlockDataArray.cs" />
     <Compile Include="Assets\Scripts\Terrain\Storage\BlockStorage.cs" />
-    <Compile Include="Assets\Scripts\Terrain\Storage\Chunk.cs" />
     <Compile Include="Assets\Scripts\Terrain\Storage\Coordinate.cs" />
     <Compile Include="Assets\Scripts\Terrain\Storage\IBlockStorage.cs" />
+    <Compile Include="Assets\Scripts\Terrain\Storage\MarchingPointDictionary.cs" />
     <Compile Include="Assets\Scripts\Terrain\Storage\Octree.cs" />
     <Compile Include="Assets\Scripts\Terrain\TerrainEditTool.cs" />
     <Compile Include="Assets\Scripts\Utility.cs" />

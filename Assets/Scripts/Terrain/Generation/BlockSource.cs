@@ -40,26 +40,11 @@ public abstract class BlockSource : IBlockSource {
   /// </summary>
   /// <param name="points"></param>
   public void generateAll(MarchingPointDictionary points) {
-    isoSurfaceLevel = points.isoSurfaceLevel = getIsoSurfaceLevel();
+    isoSurfaceLevel = getIsoSurfaceLevel();
     Coordinate.Zero.until(points.bounds + 1, (coordinate) => {
-      points.updateBlock(coordinate, getBlockValueAt(coordinate));
+      float isoSurfaceDensityValue = getNoiseValueAt(coordinate);
+      points.updateBlock(coordinate, getBlockTypeFor(isoSurfaceDensityValue), isoSurfaceDensityValue);
     });
-  }
-
-  /// <summary>
-  /// Get the block value at the location using the overriden functions
-  /// </summary>
-  /// <param name="location"></param>
-  /// <returns></returns>
-  protected int getBlockValueAt(Coordinate location) {
-    int blockData                = 0;
-    float isoSurfaceDensityValue = getNoiseValueAt(location);
-    byte blockTypeId             = getBlockTypeFor(isoSurfaceDensityValue);
-
-    blockData = blockData.SetBlockTypeId(blockTypeId);
-    blockData = blockData.SetBlockScalarDensity(isoSurfaceDensityValue);
-
-    return blockData;
   }
 
   /// <summary>
