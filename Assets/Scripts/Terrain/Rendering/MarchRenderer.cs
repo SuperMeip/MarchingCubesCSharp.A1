@@ -105,9 +105,7 @@ public class MarchRenderer {
         //interpolate between them to determine the location of this vertex
         blockVertexes[i] = VertexInterpolate(
           blockVertexLocations[edgeVerticies[0]].Vec3,
-          blockVertexLocations[edgeVerticies[1]].Vec3,
-          blockVertexValues[edgeVerticies[0]].GetBlockScalarDensityFloat(),
-          blockVertexValues[edgeVerticies[1]].GetBlockScalarDensityFloat()
+          blockVertexLocations[edgeVerticies[1]].Vec3
         );
       }
     }
@@ -139,21 +137,8 @@ public class MarchRenderer {
   /// <param name="valueP1"></param>
   /// <param name="valueP2"></param>
   /// <returns></returns>
-  private Vector3 VertexInterpolate(Vector3 edgePointOne, Vector3 edgePointTwo, float pointScalarOne, float pointScalarTwo) {
-    if (Utility.Abs(isoSurfaceLevel - pointScalarOne) < clippingLevel) {
-      return edgePointOne;
-    }
-    if (Utility.Abs(isoSurfaceLevel - pointScalarTwo) < clippingLevel) {
-      return edgePointTwo;
-    }
-    if (Utility.Abs(pointScalarOne - pointScalarTwo) < clippingLevel) {
-      return edgePointOne;
-    }
-
-    float mu = 0.5f;//((isoSurfaceLevel - pointScalarOne) / (pointScalarTwo - pointScalarOne)).Box01();
-    Vector3 p = edgePointOne + mu * (edgePointTwo - edgePointOne);
-
-    return p;
+  private Vector3 VertexInterpolate(Vector3 edgePointOne, Vector3 edgePointTwo) {
+    return edgePointOne + 0.5f * (edgePointTwo - edgePointOne);
   }
 
   /// <summary>

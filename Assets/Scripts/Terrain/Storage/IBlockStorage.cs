@@ -3,7 +3,7 @@
   /// <summary>
   /// The itteratable bounds of this collection of blocks, x, y, and z
   /// </summary>
-  public Coordinate bounds {
+  Coordinate bounds {
     get;
   }
 

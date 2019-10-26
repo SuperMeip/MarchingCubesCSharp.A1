@@ -3,7 +3,7 @@ using System.Collections;
 
 [RequireComponent(typeof(MeshCollider))]
 [RequireComponent(typeof(MeshFilter))]
-public class ChunkRenderer : MonoBehaviour {
+public class Chunk : MonoBehaviour {
 
   /// <summary>
   /// The unity mesh filter
@@ -20,14 +20,14 @@ public class ChunkRenderer : MonoBehaviour {
   /// </summary>
   MarchRenderer blockRenderer;
 
-  public float isoSurfaceLevel = 0.5f;
+  public float isoSurfaceLevelOverride = 0.5f;
 
   public float clippingLevel = 0.00001f;
 
   /// <summary>
   /// The block data
   /// </summary>
-  public MarchingPointDictionary blockData;
+  public IBlockStorage blockData;
 
   private void Awake() {
     meshFilter = GetComponent<MeshFilter>();
@@ -50,7 +50,7 @@ public class ChunkRenderer : MonoBehaviour {
 
   private void OnMouseDown() {
     blockRenderer = new MarchRenderer();
-    Mesh mesh = blockRenderer.generateMesh(blockData, isoSurfaceLevel, clippingLevel);
+    Mesh mesh = blockRenderer.generateMesh(blockData, isoSurfaceLevelOverride, clippingLevel);
 
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;

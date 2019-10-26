@@ -6,15 +6,15 @@ public class WorldTest : MonoBehaviour {
 
   // Use this for initialization
   void Start() {
-    IBlockSource source = new WaveSource();
+    IBlockSource source = new TestSource();
     MarchingPointDictionary blockData = new MarchingPointDictionary((64, 64, 64));
     source.generateAll(blockData);
 
-    ChunkRenderer chunk = Instantiate(
+    Chunk chunk = Instantiate(
       chunkPrefab,
       Vector3.zero,
       Quaternion.identity
-    ).GetComponent<ChunkRenderer>();
+    ).GetComponent<Chunk>();
     chunk.blockData = blockData;
   }
 
