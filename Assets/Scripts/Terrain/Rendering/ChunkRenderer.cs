@@ -1,9 +1,8 @@
 ﻿using UnityEngine;
-using System.Collections;
 
 [RequireComponent(typeof(MeshCollider))]
 [RequireComponent(typeof(MeshFilter))]
-public class Chunk : MonoBehaviour {
+public class ChunkRenderer : MonoBehaviour {
 
   /// <summary>
   /// The unity mesh filter
@@ -20,15 +19,19 @@ public class Chunk : MonoBehaviour {
   /// </summary>
   MarchRenderer blockRenderer;
 
+  /// <summary>
+  /// Override for iso surface level
+  /// </summary>
   public float isoSurfaceLevelOverride = 0.5f;
 
-  public float clippingLevel = 0.00001f;
-
   /// <summary>
-  /// The block data
+  /// The block data for the chunk
   /// </summary>
   public IBlockStorage blockData;
 
+  /// <summary>
+  ///  set up the mesh filter
+  /// </summary>
   private void Awake() {
     meshFilter = GetComponent<MeshFilter>();
     meshCollider = GetComponent<MeshCollider>();

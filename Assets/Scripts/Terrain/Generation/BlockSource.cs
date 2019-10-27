@@ -38,12 +38,22 @@ public abstract class BlockSource : IBlockSource {
   /// <summary>
   /// Generate all the blocks in the given collection with this source
   /// </summary>
-  /// <param name="points"></param>
-  public void generateAll(MarchingPointDictionary points) {
+  /// <param name="blockData"></param>
+  public void generateAll(IBlockStorage blockData) {
+    generateAllAt(Coordinate.Zero, blockData);
+  }
+
+  /// <summary>
+  /// Generate the given set of blockdata at the given location offset
+  /// </summary>
+  /// <param name="location"></param>
+  /// <param name="blockData"></param>
+  public void generateAllAt(Coordinate location, IBlockStorage blockData) {
     isoSurfaceLevel = getIsoSurfaceLevel();
-    Coordinate.Zero.until(points.bounds + 1, (coordinate) => {
-      float isoSurfaceDensityValue = getNoiseValueAt(coordinate);
-      points.updateBlock(coordinate, getBlockTypeFor(isoSurfaceDensityValue), isoSurfaceDensityValue);
+    Coordinate.Zero.until(blockData.bounds + 1, (coordinate) => {
+      Coordinate localLocation = coordinate + location;
+      float isoSurfaceDensityValue = getNoiseValueAt(localLocation);
+      blockData.updateBlock(localLocation, getBlockTypeFor(isoSurfaceDensityValue), isoSurfaceDensityValue);
     });
   }
 

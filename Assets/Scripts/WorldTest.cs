@@ -10,11 +10,11 @@ public class WorldTest : MonoBehaviour {
     MarchingPointDictionary blockData = new MarchingPointDictionary((64, 64, 64));
     source.generateAll(blockData);
 
-    Chunk chunk = Instantiate(
+    ChunkRenderer chunk = Instantiate(
       chunkPrefab,
       Vector3.zero,
       Quaternion.identity
-    ).GetComponent<Chunk>();
+    ).GetComponent<ChunkRenderer>();
     chunk.blockData = blockData;
   }
 

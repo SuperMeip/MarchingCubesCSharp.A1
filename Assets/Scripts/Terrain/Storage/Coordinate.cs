@@ -613,6 +613,15 @@ public struct Coordinate {
       && y < bounds.y
       && z < bounds.z;
   }
+  
+  /// <summary>
+  /// Checks if this coordinate is greater than a lower bounds coordinate
+  /// </summary>
+  public bool isBeyond(Coordinate bounds) {
+    return x > bounds.x
+      && y > bounds.y
+      && z > bounds.z;
+  }
 
   /// <summary>
   /// preform the acton on all coordinates between this one and the end coordinate
