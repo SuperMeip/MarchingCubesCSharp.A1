@@ -4,6 +4,7 @@ using System;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
+using System.Threading;
 
 /// <summary>
 /// A collection of chunks, making an enclosed world in game
@@ -381,8 +382,8 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
     /// <param name="level"></param>
     /// <param name="chunkLocation"></param>
     /// <returns></returns>
-    protected override IThreadedJob getChildJob(Level<ChunkType> level, Coordinate chunkLocation) {
-      return new JLoadChunk(level, chunkLocation);
+    protected override ChunkLoadingJob getChildJob(Level<ChunkType> level, Coordinate chunkLocation) {
+      return new JLoadChunk(level, chunkLocation, childJobResourcePool);
     }
   }
 
@@ -406,8 +407,8 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
     /// <param name="level"></param>
     /// <param name="chunkLocation"></param>
     /// <returns></returns>
-    protected override IThreadedJob getChildJob(Level<ChunkType> level, Coordinate chunkLocation) {
-      return new JUnloadChunk(level, chunkLocation);
+    protected override ChunkLoadingJob getChildJob(Level<ChunkType> level, Coordinate chunkLocation) {
+      return new JUnloadChunk(level, chunkLocation, childJobResourcePool);
     }
   }
 
@@ -415,32 +416,20 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// A Job for loading the data for a single chunk into a level
   /// @TODO: update this to load the entire Y column of chunks, make a base job that runs a function once for each y chunk.
   /// </summary>
-  class JLoadChunk : ThreadedJob {
-
-    /// <summary>
-    /// The level we're loading for
-    /// </summary>
-    Level<ChunkType> level;
-
-    /// <summary>
-    /// The location of the chunk that this job is loading.
-    /// </summary>
-    Coordinate chunkLocation;
+  class JLoadChunk : ChunkLoadingJob {
 
     /// <summary>
     /// Make a new job
     /// </summary>
     /// <param name="level"></param>
     /// <param name="chunkLocation"></param>
-    public JLoadChunk(Level<ChunkType> level, Coordinate chunkLocation) {
-      this.level = level;
-      this.chunkLocation = chunkLocation;
-    }
+    internal JLoadChunk(Level<ChunkType> level, Coordinate chunkLocation, Semaphore resourcePool)
+      : base(level, chunkLocation, resourcePool) { }
 
     /// <summary>
     /// Threaded function, loads all the block data for this chunk
     /// </summary>
-    protected override void jobFunction() {
+    protected override void doWorkOnColumnOfChunks() {
       ChunkType chunkData = level.loadChunkData(chunkLocation);
       level.loadedChunks[chunkLocation] = chunkData;
     }
@@ -449,32 +438,20 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// <summary>
   /// A Job for loading the data for a single chunk into a level
   /// </summary>
-  class JUnloadChunk : ThreadedJob {
-
-    /// <summary>
-    /// The level we're loading for
-    /// </summary>
-    Level<ChunkType> level;
-
-    /// <summary>
-    /// The location of the chunk that this job is loading.
-    /// </summary>
-    Coordinate chunkLocation;
+  class JUnloadChunk : ChunkLoadingJob {
 
     /// <summary>
     /// Make a new job
     /// </summary>
     /// <param name="level"></param>
     /// <param name="chunkLocation"></param>
-    public JUnloadChunk(Level<ChunkType> level, Coordinate chunkLocation) {
-      this.level = level;
-      this.chunkLocation = chunkLocation;
-    }
+    internal JUnloadChunk(Level<ChunkType> level, Coordinate chunkLocation, Semaphore resourcePool) 
+      : base(level, chunkLocation, resourcePool) { }
 
     /// <summary>
     /// Threaded function, serializes this chunks block data and removes it from the level
     /// </summary>
-    protected override void jobFunction() {
+    protected override void doWorkOnColumnOfChunks() {
       level.saveChunkToFile(chunkLocation);
       level.loadedChunks.Remove(chunkLocation);
     }
@@ -483,12 +460,17 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// <summary>
   /// A job to load all chunks from the loading queue
   /// </summary>
-  public abstract class LevelQueueManagerJob : ThreadedJob {
+  abstract class LevelQueueManagerJob : ThreadedJob {
 
     /// <summary>
     /// The level we're loading for
     /// </summary>
     Level<ChunkType> level;
+
+    /// <summary>
+    /// The resource pool for child jobs
+    /// </summary>
+    protected Semaphore childJobResourcePool;
 
     /// <summary>
     /// The queue this job is managing
@@ -504,15 +486,16 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
     /// Create a new job, linked to the level
     /// </summary>
     /// <param name="level"></param>
-    public LevelQueueManagerJob(Level<ChunkType> level) {
+    protected LevelQueueManagerJob(Level<ChunkType> level) {
       this.level = level;
+      childJobResourcePool = new Semaphore(0, MaxChunkLoadingJobsCount);
     }
 
     /// <summary>
     /// Get the type of job we're managing in this queue
     /// </summary>
     /// <returns></returns>
-    protected abstract IThreadedJob getChildJob(Level<ChunkType> level, Coordinate chunkLocation);
+    protected abstract ChunkLoadingJob getChildJob(Level<ChunkType> level, Coordinate chunkLocation);
 
     /// <summary>
     /// The threaded function to run
@@ -534,7 +517,7 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
             // if it's not done yet, don't remove it
             return false;
             // if it's not being loaded yet by a job, and we have an open spot for a new job, start and add it
-          } else if (runningChildJobs.Count < MaxChunkLoadingJobsCount) {
+          } else {
             IThreadedJob chunkLoaderJob = getChildJob(level, chunkLocation);
             runningChildJobs[chunkLocation] = chunkLoaderJob;
             runningChildJobs[chunkLocation].start();
@@ -542,10 +525,50 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
             // don't remove the running job from the queue yet
             return false;
           }
-
-          // if it's not in a job yet and we don't have free spots, keep it in the queue until we do
-          return false;
         });
+      }
+    }
+  }
+
+  abstract class ChunkLoadingJob : ThreadedJob {
+
+    /// <summary>
+    /// The level we're loading for
+    /// </summary>
+    protected Level<ChunkType> level;
+
+    /// <summary>
+    /// The location of the chunk that this job is loading.
+    /// </summary>
+    protected Coordinate chunkLocation;
+
+    /// <summary>
+    /// The resource pool managing this job
+    /// </summary>
+    protected Semaphore resourcePool;
+
+    /// <summary>
+    /// Make a new job
+    /// </summary>
+    /// <param name="level"></param>
+    /// <param name="chunkLocation"></param>
+    protected ChunkLoadingJob(Level<ChunkType> level, Coordinate chunkLocation, Semaphore resourcePool) {
+      this.level = level;
+      this.chunkLocation = chunkLocation;
+      this.resourcePool = resourcePool;
+    }
+
+    /// <summary>
+    /// Do the actual work on the given chunk for this type of job
+    /// </summary>
+    protected abstract void doWorkOnColumnOfChunks();
+
+    /// <summary>
+    /// Threaded function, serializes this chunks block data and removes it from the level
+    /// </summary>
+    protected override void jobFunction() {
+      if (resourcePool.WaitOne()) {
+        doWorkOnColumnOfChunks();
       }
     }
   }
