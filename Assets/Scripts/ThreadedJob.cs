@@ -98,6 +98,11 @@ public abstract class ThreadedJob : IThreadedJob {
   protected virtual void onFinished() { }
 
   /// <summary>
+  /// what to do if the job is aborted
+  /// </summary>
+  protected virtual void onAborted() { }
+
+  /// <summary>
   /// threaded run function
   /// </summary>
   void run() {
