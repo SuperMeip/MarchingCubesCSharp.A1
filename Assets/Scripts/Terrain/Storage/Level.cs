@@ -505,7 +505,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
       /// <summary>
       /// Cancel the running job, this will abort it once it succesfully releases it's resources
       /// </summary>
-      protected void cancel() {
+      internal void cancel() {
         isCanceled = true;
       }
 
@@ -581,7 +581,8 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
     public void deQueue(Coordinate chunkColumnLocation) {
       queue.Remove(chunkColumnLocation);
       if (runningChildJobs.ContainsKey(chunkColumnLocation)) {
-        runningChildJobs[chunkColumnLocation].abort();
+        ChunkColumnLoadingJob job = (ChunkColumnLoadingJob)runningChildJobs[chunkColumnLocation];
+        job.cancel();
         runningChildJobs.Remove(chunkColumnLocation);
       }
     }
@@ -591,8 +592,8 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
     /// </summary>
     public void clearRunningJobs() {
       if (runningChildJobs.Count >= 1) {
-        foreach (IThreadedJob job in runningChildJobs.Values) {
-          job.abort();
+        foreach (ChunkColumnLoadingJob job in runningChildJobs.Values) {
+          job.cancel();
         }
       }
 
