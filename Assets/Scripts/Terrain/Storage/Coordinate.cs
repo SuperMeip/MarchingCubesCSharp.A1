@@ -473,11 +473,18 @@ public struct Coordinate {
   /// <summary>
   /// This as a vector 3
   /// </summary>
-  public Vector3 Vec3 {
+  public Vector3 vec3 {
     get {
-      var vec3 = new Vector3(x, y, z);
-      return vec3;
+      var _vec3 = new Vector3(x, y, z);
+      return _vec3;
     }
+  }
+
+  /// <summary>
+  /// shortcut for geting just he X and Z of a coordinate
+  /// </summary>
+  public Coordinate xz {
+    get => (x, 0, z);
   }
 
   /// <summary>

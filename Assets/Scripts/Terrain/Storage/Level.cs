@@ -50,6 +50,12 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   Dictionary<Coordinate, ChunkType> loadedChunks;
 
   /// <summary>
+  /// The columns of chunks already loaded/being loaded
+  /// @TODO: impliment this
+  /// </summary>
+  HashSet<Coordinate> loadedChunkColumns;
+
+  /// <summary>
   /// The chunks that need to be loaded next
   /// </summary>
   List<Coordinate> chunkLoadingQueue;
@@ -136,7 +142,7 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
       if (direction.Value == Directions.North.Value || direction.Value == Directions.South.Value) {
         // grab the chunks one to the direction of the current loaded ones
         for (int i = 0; i < LoadedChunkDiameter; i++) {
-          // the z comes from the extreem bound, either the northern or southern one
+          // the z comes from the extreem bound, either the northern or southern one, y is 0
           Coordinate chunkToLoad = loadedChunkBounds[direction.Value == Directions.North.Value ? 1 : 0] + direction.Offset;
           // the x is calculated from the SW corner's W, plust the current i
           chunkToLoad.x = i + loadedChunkBounds[1].x - LoadedChunkDiameter;
@@ -198,7 +204,7 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// <param name="chunkLocations"></param>
   void addChunksToLoadingQueue(Coordinate[] chunkLocations) {
     foreach (Coordinate chunkLocation in chunkLocations) {
-      addChunkToLoadingQueue(chunkLocation);
+      addChunkColumnToLoadingQueue(chunkLocation.xz);
     }
 
     // if the load queue manager job isn't running, start it
@@ -213,7 +219,7 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// <param name="chunkLocations"></param>
   void addChunksToUnloadingQueue(Coordinate[] chunkLocations) {
     foreach (Coordinate chunkLocation in chunkLocations) {
-      addChunkToUnloadingQueue(chunkLocation);
+      addChunkColumnToUnloadingQueue(chunkLocation.xz);
     }
 
     // if the unload queue manager job isn't running, start it
@@ -246,19 +252,20 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   }
 
   /// <summary>
-  /// Get the loaded chunk bounds for a given center point
+  /// Get the loaded chunk bounds for a given center point.
+  /// Always trims to X,0,Z
   /// </summary>
   /// <param name="centerLocation"></param>
   Coordinate[] getLoadedChunkBounds(Coordinate centerLocation) {
     return new Coordinate[] {
       (
         Mathf.Max(centerLocation.x - LoadedChunkDiameter / 2, 0),
-        Mathf.Max(centerLocation.y - LoadedChunkHeight, 0),
+        0,
         Mathf.Max(centerLocation.z - LoadedChunkDiameter / 2, 0)
       ),
       (
         Mathf.Min(centerLocation.x + LoadedChunkDiameter / 2, chunkBounds.x - 1),
-        Mathf.Min(centerLocation.y + LoadedChunkHeight, chunkBounds.y - 1),
+        0,
         Mathf.Min(centerLocation.z + LoadedChunkDiameter / 2, chunkBounds.z - 1)
       )
     };
@@ -324,18 +331,25 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
 
   /// <summary>
   /// Add the chunk to the queue of chunks to be loaded
+  /// please make sure y = 0
   /// </summary>
-  /// <param name="chunkLocation"></param>
-  void addChunkToLoadingQueue(Coordinate chunkLocation) {
-    chunkLoadingQueue.Add(chunkLocation);
+  /// <param name="chunkColumn">Make sure y = 0</param>
+  void addChunkColumnToLoadingQueue(Coordinate chunkColumn) {
+    if (!loadedChunkColumns.Contains(chunkColumn) && chunkColumn.y == 0) {
+      chunkLoadingQueue.Add(chunkColumn);
+      loadedChunkColumns.Add(chunkColumn);
+    }
   }
 
   /// <summary>
   /// Add the chunk to the queue of chunks to be unloaded
   /// </summary>
-  /// <param name="chunkLocation"></param>
-  void addChunkToUnloadingQueue(Coordinate chunkLocation) {
-    chunkUnloadingQueue.Add(chunkLocation);
+  /// <param name="chunkColumn">make sure y = 0</param>
+  void addChunkColumnToUnloadingQueue(Coordinate chunkColumn) {
+    if (loadedChunkColumns.Contains(chunkColumn) && chunkColumn.y == 0) {
+      chunkUnloadingQueue.Add(chunkColumn);
+      loadedChunkColumns.Remove(chunkColumn);
+    }
   }
 
   /// <summary>
@@ -399,7 +413,7 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
 
   /// <summary>
   /// A Job for loading the data for a single chunk into a level
-  /// @TODO: update this to load the entire Y column of chunks
+  /// @TODO: update this to load the entire Y column of chunks, make a base job that runs a function once for each y chunk.
   /// </summary>
   class JLoadChunk : ThreadedJob {
 

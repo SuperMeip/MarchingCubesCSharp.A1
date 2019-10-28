@@ -104,8 +104,8 @@ public class MarchRenderer {
 
         //interpolate between them to determine the location of this vertex
         blockVertexes[i] = VertexInterpolate(
-          blockVertexLocations[edgeVerticies[0]].Vec3,
-          blockVertexLocations[edgeVerticies[1]].Vec3
+          blockVertexLocations[edgeVerticies[0]].vec3,
+          blockVertexLocations[edgeVerticies[1]].vec3
         );
       }
     }
