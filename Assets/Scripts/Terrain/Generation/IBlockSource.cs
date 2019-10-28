@@ -5,6 +5,13 @@
 public interface IBlockSource {
 
   /// <summary>
+  /// The seed for this blocksource
+  /// </summary>
+  int seed {
+    get;
+  }
+
+  /// <summary>
   /// Generate all given blocks
   /// </summary>
   /// <param name="blockData"></param>

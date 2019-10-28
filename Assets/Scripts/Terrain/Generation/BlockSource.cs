@@ -3,6 +3,14 @@
 public abstract class BlockSource : IBlockSource {
 
   /// <summary>
+  /// The generation seed
+  /// </summary>
+  public int seed {
+    get;
+    protected set;
+  }
+
+  /// <summary>
   /// The noise generator used for this block source
   /// </summary>
   protected Noise.FastNoise noise { get; }
@@ -19,6 +27,7 @@ public abstract class BlockSource : IBlockSource {
   /// Create a new block source
   /// </summary>
   public BlockSource(int seed = 1234) {
+    this.seed = seed;
     noise = new Noise.FastNoise(seed);
     setUpNoise();
   }

@@ -9,7 +9,7 @@ using System.Threading;
 /// <summary>
 /// A collection of chunks, making an enclosed world in game
 /// </summary>
-public class Level<ChunkType> where ChunkType : BlockStorage {
+public class Level<ChunkType> where ChunkType : IBlockStorage {
 
   /// <summary>
   /// The block diameter, x y and z, of a chunk in this level
@@ -89,13 +89,13 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// </summary>
   /// <param name="seed"></param>
   /// <param name="chunkBounds">the max x y and z chunk sizes of the world</param>
-  public Level(int seed, Coordinate chunkBounds) {
+  public Level(Coordinate chunkBounds, IBlockSource blockSource) {
+    this.blockSource           = blockSource;
     this.chunkBounds           = chunkBounds;
-    this.seed                  = seed;
+    seed                       = blockSource.seed;
     chunkLoadQueueManagerJob   = new JLoadChunks(this);
     chunkUnloadQueueManagerJob = new JUnloadChunks(this);
     loadedChunkColumns         = new HashSet<Coordinate>();
-    blockSource                = new WaveSource(seed);
     loadedChunks               = new Dictionary<Coordinate, ChunkType>(
       chunkBounds.x * chunkBounds.y * chunkBounds.z
     );
@@ -118,8 +118,8 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
     List<Coordinate> chunksToLoad   = new List<Coordinate>();
     List<Coordinate> chunksToUnload = new List<Coordinate>();
 
+    // add new chunks to the load queue in the given direction
     if (Array.IndexOf(Directions.Cardinal, direction) > -1) {
-      // add new chunks to the load queue in the given direction
       // NS
       if (direction.Value == Directions.North.Value || direction.Value == Directions.South.Value) {
         // grab the chunks one to the direction of the current loaded ones
@@ -161,12 +161,13 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// Get the chunk at the given location (if it's loaded)
   /// </summary>
   /// <param name="location"></param>
+  /// <returns>the chunk data or null if there's none loaded</returns>
   public ChunkType getChunk(Coordinate chunkLocation) {
     return chunkLocation.isWithin(chunkBounds)
-      && chunkIsWithinLoadedBounds(chunkLocation)
+      && chunkIsWithinkLoadedBounds(chunkLocation)
       && loadedChunks.ContainsKey(chunkLocation)
         ? loadedChunks[chunkLocation]
-        : null;
+        : default;
   }
 
   /// <summary>
@@ -321,7 +322,7 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
   /// </summary>
   /// <param name="chunkLocation"></param>
   /// <returns></returns>
-  bool chunkIsWithinLoadedBounds(Coordinate chunkLocation) {
+  bool chunkIsWithinkLoadedBounds(Coordinate chunkLocation) {
     return chunkLocation.isWithin(loadedChunkBounds[1]) && chunkLocation.isBeyond(loadedChunkBounds[0]);
   }
 
@@ -481,9 +482,14 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
       protected Semaphore resourcePool;
 
       /// <summary>
-      /// If we have a resource that is provisioned and needs to be released
+      /// If this job has been cancled
       /// </summary>
-      bool resourceIsProvisioned = false;
+      bool isCanceled = false;
+
+      /// <summary>
+      /// If this job has started running
+      /// </summary>
+      bool jobHasStarted = false;
 
       /// <summary>
       /// Make a new job
@@ -497,6 +503,13 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
       }
 
       /// <summary>
+      /// Cancel the running job, this will abort it once it succesfully releases it's resources
+      /// </summary>
+      protected void cancel() {
+        isCanceled = true;
+      }
+
+      /// <summary>
       /// Do the actual work on the given chunk for this type of job
       /// </summary>
       protected abstract void doWorkOnChunk(Coordinate chunkLocation);
@@ -505,28 +518,20 @@ public class Level<ChunkType> where ChunkType : BlockStorage {
       /// Threaded function, serializes this chunks block data and removes it from the level
       /// </summary>
       protected override void jobFunction() {
-        if (resourcePool.WaitOne()) {
-          resourceIsProvisioned = true;
-          Coordinate columnTop = (chunkColumnLocation.x, level.chunkBounds.y, chunkColumnLocation.z);
+        // wait until we have a resouces, or the job is canceled.
+        if (resourcePool.WaitOne(-1, isCanceled)) {
+          jobHasStarted = true;
+          Coordinate columnTop    = (chunkColumnLocation.x, level.chunkBounds.y, chunkColumnLocation.z);
           Coordinate columnBottom = (chunkColumnLocation.x, 0, chunkColumnLocation.z);
           columnBottom.until(columnTop, chunkLocation => {
             doWorkOnChunk(chunkLocation);
           });
-        }
 
-        resourcePool.Release();
-        resourceIsProvisioned = false;
-      }
-
-      /// <summary>
-      /// If we abort, make sure we release the resource
-      /// </summary>
-      protected override void onAborted() {
-        if (resourceIsProvisioned) {
           resourcePool.Release();
+        // if the job is canceled, abort after releasing the resource
+        } else {
+          abort();
         }
-
-        base.onAborted();
       }
     }
 
