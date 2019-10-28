@@ -1,5 +1,7 @@
 ﻿using Block;
+using System;
 
+[Serializable]
 public abstract class BlockStorage : IBlockStorage {
 
   /// <summary>
@@ -9,6 +11,20 @@ public abstract class BlockStorage : IBlockStorage {
     get;
     protected set;
   }
+
+  /// <summary>
+  /// Generic base constructor
+  /// </summary>
+  /// <param name="bounds"></param>
+  public BlockStorage(Coordinate bounds) {
+    this.bounds = bounds;
+  }
+
+  /// <summary>
+  /// Base constructor all same bounds
+  /// </summary>
+  /// <param name="bound">x,y,and z's shared max bound</param>
+  public BlockStorage(int bound) : this(new Coordinate(bound)) { }
 
   /// <summary>
   /// Get the block data as an int bitmask at the given x,y,z

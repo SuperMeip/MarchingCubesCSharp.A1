@@ -20,11 +20,11 @@ public class MarchingPointDictionary : BlockStorage {
   /// Create a new marching point block dictionary of the given size
   /// </summary>
   /// <param name="bounds"></param>
-  public MarchingPointDictionary(Coordinate bounds) {
-    this.bounds = bounds;
+  public MarchingPointDictionary(Coordinate bounds) : base(bounds) {
     trueBounds = this.bounds + 1;
     points = new Dictionary<Coordinate, int>(trueBounds.x * trueBounds.y * trueBounds.z);
-  }
+  } //int version:
+  public MarchingPointDictionary(int bound) : this(new Coordinate(bound)) { }
 
   /// <summary>
   /// Get the block at the location from the dictionary

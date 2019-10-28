@@ -5,7 +5,7 @@ public class LevelManager : MonoBehaviour {
 
   public const int RenderedChunkDiameter = 30;
 
-  Level level;
+  Level<MarchingPointDictionary> level;
 
   Dictionary<Coordinate, ChunkRenderer> chunkRendererPool;
 
@@ -24,7 +24,7 @@ public class LevelManager : MonoBehaviour {
     chunkRenderQueue  = new List<Coordinate>();
   }
 
-  void queChunkForRender(Coordinate location) {
-    IBlockStorage chunkBlockData = level.getChunk(location);
+  public void Initialize(Coordinate focusChunkLocation) {
+
   }
 }

@@ -1,6 +1,7 @@
 ﻿
 using System.Linq;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -27,6 +28,13 @@ public static class Directions {
     public string Name {
       get;
       private set;
+    }
+
+    /// <summary>
+    /// The x y z offset of this direction from the origin
+    /// </summary>
+    public Coordinate Offset {
+      get => Offsets[Value];
     }
 
     /// <summary>
@@ -145,6 +153,28 @@ public static class Directions {
     West,
     Above,
     Below
+  };
+
+  /// <summary>
+  /// The cardinal directions. Non Y related
+  /// </summary>
+  public static Direction[] Cardinal = new Direction[4] {
+    North,
+    East,
+    South,
+    West
+  };
+
+  /// <summary>
+  /// The coordinate directional offsets
+  /// </summary>
+  public static Coordinate[] Offsets = new Coordinate[6] {
+    (0,0,1),
+    (1,0,0),
+    (0,0,-1),
+    (-1, 0, 0),
+    (0, 1, 0),
+    (0, -1, 0)
   };
 }
 
@@ -638,6 +668,21 @@ public struct Coordinate {
         }
       }
     }
+  }
+
+  /// <summary>
+  /// Get all the points within two sets of bounds
+  /// </summary>
+  /// <param name="westBottomSouthBound"> the lesser bound, -,-,-</param>
+  /// <param name="eastTopNorthBound">the greater bound, +,+,+</param>
+  /// <returns>All points between these bounds</returns>
+  public static Coordinate[] GetAllPointsBetween(Coordinate westBottomSouthBound, Coordinate eastTopNorthBound) {
+    List<Coordinate> points = new List<Coordinate>();
+    westBottomSouthBound.until(eastTopNorthBound, (coordinate) => {
+      points.Add(coordinate);
+    });
+
+    return points.ToArray();
   }
 
   public override string ToString() {
