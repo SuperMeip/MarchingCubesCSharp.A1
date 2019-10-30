@@ -74,6 +74,7 @@ public abstract class ThreadedJob : IThreadedJob {
   /// </summary>
   public void abort() {
     thread.Abort();
+    isRunning = false;
   }
 
   /// <summary>

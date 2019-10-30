@@ -37,8 +37,9 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
   /// <param name="chunkBounds"></param>
   /// <param name="blockSource"></param>
   public ColumnLoadedLevel(Coordinate chunkBounds, IBlockSource blockSource) : base(chunkBounds, blockSource) {
-    chunkLoadQueueManagerJob = new JLoadChunks(this);
+    chunkLoadQueueManagerJob   = new JLoadChunks(this);
     chunkUnloadQueueManagerJob = new JUnloadChunks(this);
+    loadedChunkColumns         = new HashSet<Coordinate>();
   }
 
 
