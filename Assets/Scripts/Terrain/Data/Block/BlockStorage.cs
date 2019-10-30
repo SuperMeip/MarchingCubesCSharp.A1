@@ -69,7 +69,7 @@ public abstract class BlockStorage : IBlockStorage {
       updateBlockVertexMask(
         blockLocation,
         neightboringVertexDirection.Reverse,
-        Block.Types.Get(blockTypeId).IsSolid
+        Block.Types.Get(blockType.Id).IsSolid
       );
     }
   }

@@ -4,7 +4,7 @@ using System.Threading;
 /// <summary>
 /// A base job for managing chunk work queues
 /// </summary>
-abstract class LevelQueueManagerJob<QueueObjectType> : ThreadedJob {
+public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
 
   /// <summary>
   /// An interface for a managed child queue job
@@ -30,7 +30,7 @@ abstract class LevelQueueManagerJob<QueueObjectType> : ThreadedJob {
     /// <summary>
     /// If this job has been cancled
     /// </summary>
-    bool isCanceled = false;
+    protected bool isCanceled = false;
 
     /// <summary>
     /// Make a new job
@@ -87,7 +87,7 @@ abstract class LevelQueueManagerJob<QueueObjectType> : ThreadedJob {
   /// Create a new job, linked to the level
   /// </summary>
   /// <param name="level"></param>
-  protected LevelQueueManagerJob(int maxChildJobsCount = 10) {
+  protected QueueManagerJob(int maxChildJobsCount = 10) {
     queue = new List<QueueObjectType>();
     runningChildJobs = new Dictionary<QueueObjectType, IThreadedJob>();
     childJobResourcePool = new Semaphore(0, maxChildJobsCount);

@@ -111,6 +111,10 @@ public static class Directions {
         && !GetType().Equals(obj.GetType()) 
         && ((Direction)obj).Value == Value;
     }
+
+    public override int GetHashCode() {
+      return Value;
+    }
   }
 
   /// <summary>
@@ -502,7 +506,7 @@ public struct Coordinate {
   /// <param name="x"></param>
   /// <param name="y"></param>
   /// <param name="z"></param>
-  public Coordinate(int x, int y = 0, int z = 0) {
+  public Coordinate(int x, int y, int z) {
     this.x = x;
     this.y = y;
     this.z = z;
@@ -663,14 +667,14 @@ public struct Coordinate {
   /// <summary>
   /// preform the acton on all coordinates between this one and the end coordinate
   /// </summary>
-  /// <param name="end"></param>
-  /// <param name="action"></param>
+  /// <param name="end">The final point to run on, inclusive</param>
+  /// <param name="action">the function to run on each point</param>
   /// <param name="step">the value by which the coordinate values are incrimented</param>
   public void until(Coordinate end, Action<Coordinate> action, int step = 1) {
     Coordinate current = (x, y, z);
-    for (current.x = x; current.x < end.x; current.x += step) {
-      for (current.y = y; current.y < end.y; current.y += step) {
-        for (current.z = z; current.z < end.z; current.z += step) {
+    for (current.x = x; current.x <= end.x; current.x += step) {
+      for (current.y = y; current.y <= end.y; current.y += step) {
+        for (current.z = z; current.z <= end.z; current.z += step) {
           action(current);
         }
       }
@@ -680,14 +684,14 @@ public struct Coordinate {
   /// <summary>
   /// preform the acton on all coordinates between this one and the end coordinate
   /// </summary>
-  /// <param name="end"></param>
-  /// <param name="action"></param>
+  /// <param name="end">The final point to run on, inclusive</param>
+  /// <param name="action">the function to run on each point</param>
   /// <param name="step">the value by which the coordinate values are incrimented</param>
   public void until(Coordinate end, Func<Coordinate, bool> action, int step = 1) {
     Coordinate current = (x, y, z);
-    for (current.x = x; current.x < end.x; current.x += step) {
-      for (current.y = y; current.y < end.y; current.y += step) {
-        for (current.z = z; current.z < end.z; current.z += step) {
+    for (current.x = x; current.x <= end.x; current.x += step) {
+      for (current.y = y; current.y <= end.y; current.y += step) {
+        for (current.z = z; current.z <= end.z; current.z += step) {
           if (!action(current)) {
             return;
           }
@@ -716,14 +720,21 @@ public struct Coordinate {
   }
 
   /// <summary>
-  /// Hash this coord, only works up to 256,256,256
+  /// Hash this coord,
+  ///   only works up to (byte, byte, byte) for 3 coords
+  ///   and up to (ushort, 0, ushort) for 2
   /// </summary>
   /// <returns></returns>
   public override int GetHashCode() {
     int hash = 0;
-    hash |= (((byte)x) << 8);
-    hash |= (((byte)y) << 16);
-    hash |= (((byte)z) << 24);
+    if (y == 0) {
+      hash |= ((short)x);
+      hash |= (((short)z) << 16);
+    } else {
+      hash |= (((byte)x) << 8);
+      hash |= (((byte)y) << 16);
+      hash |= (((byte)z) << 24);
+    }
 
     return hash;
   }

@@ -53,7 +53,7 @@ public class ChunkRenderer : MonoBehaviour {
 
   private void OnMouseDown() {
     blockRenderer = new MarchRenderer();
-    Mesh mesh = blockRenderer.generateMesh(blockData, isoSurfaceLevelOverride, clippingLevel);
+    Mesh mesh = blockRenderer.generateMesh(blockData, isoSurfaceLevelOverride);
 
     meshFilter.sharedMesh = mesh;
     meshCollider.sharedMesh = mesh;

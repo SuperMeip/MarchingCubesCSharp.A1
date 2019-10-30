@@ -6,7 +6,7 @@ public interface ILevel<ChunkType> where ChunkType : IBlockStorage {
   /// <summary>
   /// The overall bounds of the level, max x y and z
   /// </summary>
-  public Coordinate chunkBounds {
+  Coordinate chunkBounds {
     get;
   }
 

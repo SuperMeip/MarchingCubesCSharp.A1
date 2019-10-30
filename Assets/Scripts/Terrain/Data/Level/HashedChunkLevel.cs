@@ -16,7 +16,10 @@ public abstract class HashedChunkLevel<ChunkType> : Level<ChunkType> where Chunk
   /// </summary>
   /// <param name="chunkBounds"></param>
   /// <param name="blockSource"></param>
-  public HashedChunkLevel(Coordinate chunkBounds, IBlockSource blockSource) : base(chunkBounds, blockSource) {
+  public HashedChunkLevel(
+    Coordinate chunkBounds,
+    IBlockSource blockSource
+  ) : base(chunkBounds, blockSource) {
     loadedChunks = new Dictionary<long, ChunkType>(
       chunkBounds.x * chunkBounds.y * chunkBounds.z
     );
@@ -59,9 +62,9 @@ public abstract class HashedChunkLevel<ChunkType> : Level<ChunkType> where Chunk
   /// <returns></returns>
   long getChunkHash(Coordinate chunkLocation) {
     long hash = 0;
-    hash |= ((ushort)chunkLocation.x);
-    hash |= (((ushort)chunkLocation.y) << 16);
-    hash |= (((ushort)chunkLocation.z) << 24);
+    hash |= ((short)chunkLocation.x);
+    hash |= (((short)chunkLocation.y) << 16);
+    hash |= (((short)chunkLocation.z) << 24);
 
     return hash;
   }

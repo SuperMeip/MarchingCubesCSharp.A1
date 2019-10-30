@@ -10,6 +10,11 @@ using UnityEngine;
 public abstract class Level<ChunkType> : ILevel<ChunkType> where ChunkType : IBlockStorage {
 
   /// <summary>
+  /// The size of a block, in engine
+  /// </summary>
+  const float BlockSize = 1.0f;
+
+  /// <summary>
   /// The block diameter, x y and z, of a chunk in this level
   /// </summary>
   const int ChunkDiameter = 64;
@@ -20,11 +25,26 @@ public abstract class Level<ChunkType> : ILevel<ChunkType> where ChunkType : IBl
   protected const int LoadedChunkDiameter = 24;
 
   /// <summary>
+  /// The save path for levels.
+  /// </summary>
+  readonly string SavePath = Application.persistentDataPath + "/leveldata/";
+
+  /// <summary>
   /// The height of the active chunk area in chunks
   /// </summary>
   protected int LoadedChunkHeight {
     get => chunkBounds.y;
   }
+
+  /// <summary>
+  /// The source used to load blocks for new chunks in this level
+  /// </summary>
+  IBlockSource blockSource;
+
+  /// <summary>
+  /// The level seed
+  /// </summary>
+  int seed;
 
   /// <summary>
   /// The coordinates indicating the two chunks the extreems of what columns are loaded from memmory:
@@ -37,16 +57,6 @@ public abstract class Level<ChunkType> : ILevel<ChunkType> where ChunkType : IBl
   /// The current center of all loaded chunks, usually based on player location
   /// </summary>
   protected Coordinate loadedChunkFocus;
-
-  /// <summary>
-  /// The source used to load blocks for new chunks in this level
-  /// </summary>
-  IBlockSource blockSource;
-
-  /// <summary>
-  /// The level seed
-  /// </summary>
-  int seed;
 
   /// <summary>
   /// The overall bounds of the level, max x y and z
@@ -162,6 +172,6 @@ public abstract class Level<ChunkType> : ILevel<ChunkType> where ChunkType : IBl
   /// <param name="chunkLocation">the location of the chunk</param>
   /// <returns></returns>
   internal string getChunkFileName(Coordinate chunkLocation) {
-    return Application.persistentDataPath + "/" + seed + "/" + chunkLocation.ToString() + ".evxch";
+    return SavePath + "/" + seed + "/" + chunkLocation.ToString() + ".evxch";
   }
 }

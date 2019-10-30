@@ -10,16 +10,16 @@ public class Octree<TType> {
     /// <summary>
     /// The diameter of this node
     /// </summary>
-    byte diameter = 0;
+    //byte diameter = 0;
 
     /// <summary>
     /// The center of this node
     /// </summary>
-    Coordinate center;
+    //Coordinate center;
 
     /// <summary>
     /// the child nodes of this node
     /// </summary>
-    OctreeNode<TType>[] children;
+    //OctreeNode<TType>[] children;
   }
 }
