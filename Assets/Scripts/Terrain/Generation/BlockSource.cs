@@ -1,5 +1,6 @@
-﻿using Block;
-
+﻿/// <summary>
+/// Base class for a block source
+/// </summary>
 public abstract class BlockSource : IBlockSource {
 
   /// <summary>
@@ -71,10 +72,10 @@ public abstract class BlockSource : IBlockSource {
   /// </summary>
   /// <param name="isoSurfaceDensityValue"></param>
   /// <returns></returns>
-  protected virtual byte getBlockTypeFor(float isoSurfaceDensityValue) {
+  protected virtual Block.Type getBlockTypeFor(float isoSurfaceDensityValue) {
     return isoSurfaceDensityValue < isoSurfaceLevel
-      ? Block.Types.Air.Id
-      : Block.Types.Stone.Id;
+      ? Block.Types.Air
+      : Block.Types.Stone;
   }
 
   /// <summary>

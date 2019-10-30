@@ -1,60 +1,19 @@
 ﻿using System.Collections.Generic;
-using System.IO;
-using System;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
+using System;
+using System.IO;
 using System.Threading;
 
 /// <summary>
-/// A collection of chunks, making an enclosed world in game
+/// A type of level loaded column by column
 /// </summary>
-public class Level<ChunkType> where ChunkType : IBlockStorage {
-
-  /// <summary>
-  /// The block diameter, x y and z, of a chunk in this level
-  /// </summary>
-  const int ChunkDiameter = 64;
+/// <typeparam name="ChunkType"></typeparam>
+public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where ChunkType : IBlockStorage {
 
   /// <summary>
   /// The maximum number of chunk load jobs that can run for one queue manager simultaniously
   /// </summary>
   const int MaxChunkLoadingJobsCount = 10;
-
-  /// <summary>
-  /// The width of the active chunk area in chunks
-  /// </summary>
-  const int LoadedChunkDiameter = 24;
-
-  /// <summary>
-  /// The height of the active chunk area in chunks
-  /// </summary>
-  int LoadedChunkHeight {
-    get => chunkBounds.y;
-  }
-
-  /// <summary>
-  /// The coordinates indicating the two chunks the extreems of what columns are loaded from memmory:
-  ///   0: southwest most loaded chunk column
-  ///   1: northeast most loaded chunk column
-  /// </summary>
-  Coordinate[] loadedChunkBounds;
-
-  /// <summary>
-  /// The current center of all loaded chunks, usually based on player location
-  /// </summary>
-  Coordinate loadedChunkFocus;
-
-  /// <summary>
-  /// The active chunks, stored by coordinate location
-  /// </summary>
-  Dictionary<Coordinate, ChunkType> loadedChunks;
-
-  /// <summary>
-  /// The columns of chunks already loaded/being loaded
-  /// @TODO: impliment this
-  /// </summary>
-  HashSet<Coordinate> loadedChunkColumns;
 
   /// <summary>
   /// The current parent job, in charge of loading the chunks in the load queue
@@ -67,46 +26,31 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
   JUnloadChunks chunkUnloadQueueManagerJob;
 
   /// <summary>
-  /// The source used to load blocks for new chunks in this level
+  /// The columns of chunks already loaded/being loaded
+  /// @TODO: impliment this
   /// </summary>
-  IBlockSource blockSource;
+  HashSet<Coordinate> loadedChunkColumns;
 
   /// <summary>
-  /// The level seed
+  /// construct
   /// </summary>
-  int seed;
-
-  /// <summary>
-  /// The overall bounds of the level, max x y and z
-  /// </summary>
-  public Coordinate chunkBounds {
-    get;
-    protected set;
-  }
-
-  /// <summary>
-  /// Create a new level
-  /// </summary>
-  /// <param name="seed"></param>
-  /// <param name="chunkBounds">the max x y and z chunk sizes of the world</param>
-  public Level(Coordinate chunkBounds, IBlockSource blockSource) {
-    this.blockSource           = blockSource;
-    this.chunkBounds           = chunkBounds;
-    seed                       = blockSource.seed;
-    chunkLoadQueueManagerJob   = new JLoadChunks(this);
+  /// <param name="chunkBounds"></param>
+  /// <param name="blockSource"></param>
+  public ColumnLoadedLevel(Coordinate chunkBounds, IBlockSource blockSource) : base(chunkBounds, blockSource) {
+    chunkLoadQueueManagerJob = new JLoadChunks(this);
     chunkUnloadQueueManagerJob = new JUnloadChunks(this);
-    loadedChunkColumns         = new HashSet<Coordinate>();
-    loadedChunks               = new Dictionary<Coordinate, ChunkType>(
-      chunkBounds.x * chunkBounds.y * chunkBounds.z
-    );
   }
+
 
   /// <summary>
   /// initialize this level with the center of loaded chunks fouced on the given location
   /// </summary>
   /// <param name="centerChunkLocation">the center point/focus of the loaded chunks, usually a player location</param>
-  public void initializeAround(Coordinate centerChunkLocation) {
-    loadChunksAround(centerChunkLocation);
+  public override void initializeAround(Coordinate centerChunkLocation) {
+    loadedChunkFocus = centerChunkLocation;
+    loadedChunkBounds = getLoadedChunkBounds(loadedChunkFocus);
+    Coordinate[] chunksToLoad = Coordinate.GetAllPointsBetween(loadedChunkBounds[0], loadedChunkBounds[1]);
+    addChunkColumnsToLoadingQueue(chunksToLoad);
   }
 
   /// <summary>
@@ -114,8 +58,8 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
   /// </summary>
   /// <param name="direction">the direction the focus has moved</param>
   /// <param name="magnitude">the number of chunks in the direction that the foucs moved</param>
-  public void adjustFocus(Directions.Direction direction) {
-    List<Coordinate> chunksToLoad   = new List<Coordinate>();
+  public override void adjustFocus(Directions.Direction direction) {
+    List<Coordinate> chunksToLoad = new List<Coordinate>();
     List<Coordinate> chunksToUnload = new List<Coordinate>();
 
     // add new chunks to the load queue in the given direction
@@ -137,7 +81,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
           chunksToLoad.Add(chunkToLoad);
           chunksToUnload.Add(chunkToUnload);
         }
-      // EW
+        // EW
       } else {
         for (int i = 0; i < LoadedChunkDiameter; i++) {
           Coordinate chunkToLoad = loadedChunkBounds[direction.Value == Directions.East.Value ? 1 : 0] + direction.Offset;
@@ -158,78 +102,11 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
   }
 
   /// <summary>
-  /// Get the chunk at the given location (if it's loaded)
-  /// </summary>
-  /// <param name="location"></param>
-  /// <returns>the chunk data or null if there's none loaded</returns>
-  public ChunkType getChunk(Coordinate chunkLocation) {
-    return chunkLocation.isWithin(chunkBounds)
-      && chunkIsWithinkLoadedBounds(chunkLocation)
-      && loadedChunks.ContainsKey(chunkLocation)
-        ? loadedChunks[chunkLocation]
-        : default;
-  }
-
-  /// <summary>
-  /// Re-load the active chunks around the given XZ chunk location
-  /// </summary>
-  /// <param name="location">the X,Z chunk location to load around</param>
-  void loadChunksAround(Coordinate centerChunkLocation) {
-    loadedChunkFocus = centerChunkLocation;
-    loadedChunkBounds = getLoadedChunkBounds(loadedChunkFocus);
-    Coordinate[] chunksToLoad = Coordinate.GetAllPointsBetween(loadedChunkBounds[0], loadedChunkBounds[1]);
-    addChunkColumnsToLoadingQueue(chunksToLoad);
-  }
-
-  /// <summary>
-  /// Add multiple chunk column locations to the load queue and run it
-  /// </summary>
-  /// <param name="chunkLocations">the x,z values of the chunk columns to load</param>
-  void addChunkColumnsToLoadingQueue(Coordinate[] chunkLocations) {
-    foreach (Coordinate chunkLocation in chunkLocations) {
-      addChunkColumnToLoadingQueue(chunkLocation.xz);
-    }
-
-    // if the load queue manager job isn't running, start it
-    if (!chunkLoadQueueManagerJob.isRunning) {
-      chunkLoadQueueManagerJob.start();
-    }
-  }
-
-  /// <summary>
-  /// Add multiple chunk column locations to the unload queue and run it
-  /// </summary>
-  /// <param name="chunkLocations">the x,z values of the chunk columns to unload</param>
-  void addChunkColumnsToUnloadingQueue(Coordinate[] chunkLocations) {
-    foreach (Coordinate chunkLocation in chunkLocations) {
-      addChunkColumnToUnloadingQueue(chunkLocation.xz);
-    }
-
-    // if the unload queue manager job isn't running, start it
-    if (!chunkUnloadQueueManagerJob.isRunning) {
-      chunkUnloadQueueManagerJob.start();
-    }
-  }
-
-  /// <summary>
-  /// Clear chunks that are currently loaded from memory and stop running load jobs
-  /// </summary>
-  void clearLoadedChunks() {
-    // abort the load job and abort all child jobs
-    chunkLoadQueueManagerJob.clearRunningJobs();
-
-    // Add all exstant chunks to the unload queue
-    Coordinate[] chunksToUnload = new Coordinate[loadedChunkColumns.Count];
-    loadedChunkColumns.CopyTo(chunksToUnload, 0);
-    addChunkColumnsToUnloadingQueue(chunksToUnload);
-  }
-
-  /// <summary>
   /// Get the loaded chunk bounds for a given center point.
   /// Always trims to X,0,Z
   /// </summary>
   /// <param name="centerLocation"></param>
-  Coordinate[] getLoadedChunkBounds(Coordinate centerLocation) {
+  protected override Coordinate[] getLoadedChunkBounds(Coordinate centerLocation) {
     return new Coordinate[] {
       (
         Mathf.Max(centerLocation.x - LoadedChunkDiameter / 2, 0),
@@ -245,52 +122,33 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
   }
 
   /// <summary>
-  /// Only to be used by jobs
-  /// Save a chunk to file
+  /// Add multiple chunk column locations to the load queue and run it
   /// </summary>
-  /// <param name="chunkLocation"></param>
-  void saveChunkToFile(Coordinate chunkLocation) {
-    ChunkType chunkData = getChunk(chunkLocation);
-    if (chunkData != null) {
-      IFormatter formatter = new BinaryFormatter();
-      Stream stream = new FileStream(getChunkFileName(chunkLocation), FileMode.Create, FileAccess.Write, FileShare.None);
-      formatter.Serialize(stream, chunkData);
-      stream.Close();
+  /// <param name="chunkLocations">the x,z values of the chunk columns to load</param>
+  protected void addChunkColumnsToLoadingQueue(Coordinate[] chunkLocations) {
+    foreach (Coordinate chunkLocation in chunkLocations) {
+      addChunkColumnToLoadingQueue(chunkLocation.xz);
+    }
+
+    // if the load queue manager job isn't running, start it
+    if (!chunkLoadQueueManagerJob.isRunning) {
+      chunkLoadQueueManagerJob.start();
     }
   }
 
   /// <summary>
-  /// Get the blockdata for a chunk location from file
+  /// Add multiple chunk column locations to the unload queue and run it
   /// </summary>
-  /// <param name="chunkLocation"></param>
-  /// <returns></returns>
-  ChunkType loadChunkDataFromFile(Coordinate chunkLocation) {
-    IFormatter formatter = new BinaryFormatter();
-    Stream readStream = new FileStream(getChunkFileName(chunkLocation), FileMode.Open, FileAccess.Read, FileShare.Read);
-    ChunkType chunkData = (ChunkType)formatter.Deserialize(readStream);
-    readStream.Close();
+  /// <param name="chunkLocations">the x,z values of the chunk columns to unload</param>
+  protected void addChunkColumnsToUnloadingQueue(Coordinate[] chunkLocations) {
+    foreach (Coordinate chunkLocation in chunkLocations) {
+      addChunkColumnToUnloadingQueue(chunkLocation.xz);
+    }
 
-    return chunkData;
-  }
-
-  /// <summary>
-  /// Generate the chunk data for the chunk at the given location
-  /// </summary>
-  /// <param name="chunkLocation"></param>
-  ChunkType generateChunkData(Coordinate chunkLocation) {
-    ChunkType chunkData = (ChunkType)Activator.CreateInstance(typeof(ChunkType), ChunkDiameter);
-    blockSource.generateAllAt(chunkLocation, chunkData);
-
-    return chunkData;
-  }
-
-  /// <summary>
-  /// Get the file name a chunk is saved to based on it's location
-  /// </summary>
-  /// <param name="chunkLocation">the location of the chunk</param>
-  /// <returns></returns>
-  string getChunkFileName(Coordinate chunkLocation) {
-    return Application.persistentDataPath + "/" + seed + "/" + chunkLocation.ToString() + ".evxch";
+    // if the unload queue manager job isn't running, start it
+    if (!chunkUnloadQueueManagerJob.isRunning) {
+      chunkUnloadQueueManagerJob.start();
+    }
   }
 
   /// <summary>
@@ -315,15 +173,6 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
       chunkUnloadQueueManagerJob.enQueue(chunkColumn);
       loadedChunkColumns.Remove(chunkColumn);
     }
-  }
-
-  /// <summary>
-  /// Get if the given chunkLocation is loaded
-  /// </summary>
-  /// <param name="chunkLocation"></param>
-  /// <returns></returns>
-  bool chunkIsWithinkLoadedBounds(Coordinate chunkLocation) {
-    return chunkLocation.isWithin(loadedChunkBounds[1]) && chunkLocation.isBeyond(loadedChunkBounds[0]);
   }
 
   /// <summary>
@@ -352,7 +201,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
       protected override void doWorkOnChunk(Coordinate chunkLocation) {
         if (level.getChunk(chunkLocation) == null) {
           ChunkType chunkData = level.generateChunkData(chunkLocation);
-          level.loadedChunks[chunkLocation] = chunkData;
+          level.setChunk(chunkLocation, chunkData);
         }
       }
     }
@@ -377,8 +226,8 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
       /// </summary>
       protected override void doWorkOnChunk(Coordinate chunkLocation) {
         if (level.getChunk(chunkLocation) == null) {
-          ChunkType chunkData = level.loadChunkDataFromFile(chunkLocation);
-          level.loadedChunks[chunkLocation] = chunkData;
+          ChunkType chunkData = level.getChunkDataFromFile(chunkLocation);
+          level.setChunk(chunkLocation, chunkData);
         }
       }
     }
@@ -404,7 +253,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
     /// <returns></returns>
     protected override ChunkColumnLoadingJob getChildJob(Level<ChunkType> level, Coordinate chunkLocation) {
       // create two queues for these
-      if (File.Exists(level.getChunkFileName(chunkLocation))) { 
+      if (File.Exists(level.getChunkFileName(chunkLocation))) {
         return new JLoadChunkColumnFromFile(level, chunkLocation, childJobResourcePool);
       }
 
@@ -435,7 +284,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
       /// </summary>
       protected override void doWorkOnChunk(Coordinate chunkLocation) {
         level.saveChunkToFile(chunkLocation);
-        level.loadedChunks.Remove(chunkLocation);
+        level.removeChunk(chunkLocation);
       }
     }
 
@@ -443,7 +292,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
     /// Create a new job, linked to the level
     /// </summary>
     /// <param name="level"></param>
-    public JUnloadChunks(Level<ChunkType> level) : base(level) {}
+    public JUnloadChunks(Level<ChunkType> level) : base(level) { }
 
     /// <summary>
     /// Make a new unload chunk job
@@ -520,7 +369,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
       protected override void jobFunction() {
         // wait until we have a resouces, or the job is canceled.
         if (resourcePool.WaitOne(-1, isCanceled)) {
-          Coordinate columnTop    = (chunkColumnLocation.x, level.chunkBounds.y, chunkColumnLocation.z);
+          Coordinate columnTop = (chunkColumnLocation.x, level.chunkBounds.y, chunkColumnLocation.z);
           Coordinate columnBottom = (chunkColumnLocation.x, 0, chunkColumnLocation.z);
           columnBottom.until(columnTop, chunkLocation => {
             if (!isCanceled) {
@@ -532,7 +381,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
           });
 
           resourcePool.Release();
-        // if the job is canceled, abort after releasing the resource
+          // if the job is canceled, abort after releasing the resource
         } else {
           abort();
         }
@@ -564,9 +413,9 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
     /// </summary>
     /// <param name="level"></param>
     protected LevelQueueManagerJob(Level<ChunkType> level) {
-      this.level           = level;
-      queue                = new List<Coordinate>();
-      runningChildJobs     = new Dictionary<Coordinate, IThreadedJob>();
+      this.level = level;
+      queue = new List<Coordinate>();
+      runningChildJobs = new Dictionary<Coordinate, IThreadedJob>();
       childJobResourcePool = new Semaphore(0, MaxChunkLoadingJobsCount);
     }
 
@@ -603,7 +452,7 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
 
       // create a new load pipeline
       runningChildJobs = new Dictionary<Coordinate, IThreadedJob>();
-      queue            = new List<Coordinate>();
+      queue = new List<Coordinate>();
     }
 
     /// <summary>

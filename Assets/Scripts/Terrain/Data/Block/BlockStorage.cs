@@ -56,8 +56,8 @@ public abstract class BlockStorage : IBlockStorage {
   /// <param name="blockTypeId">The new block id</param>
   /// <param name="densityValue">the new density value</param>
   /// <returns>the updated block value with bitmask included</returns>
-  public void updateBlock(Coordinate location, byte blockTypeId, float? densityValue = null) {
-    updateBlockTypeId(location, blockTypeId);
+  public void updateBlock(Coordinate location, Block.Type blockType, float? densityValue = null) {
+    updateBlockType(location, blockType);
     if (densityValue != null) {
       updateBlockScalarDensity(location, (float)densityValue);
     }
@@ -88,9 +88,9 @@ public abstract class BlockStorage : IBlockStorage {
   /// Helper function to set just the id of a block at a given location
   /// </summary>
   /// <param name="location">the x,y,z of the block to set</param>
-  /// <param name="blockTypeId">The new block id</param>
-  protected void updateBlockTypeId(Coordinate location, byte blockTypeId) {
-    setBlock(location, getBlock(location).SetBlockTypeId(blockTypeId));
+  /// <param name="blockType">The new block id</param>
+  protected void updateBlockType(Coordinate location, Block.Type blockType) {
+    setBlock(location, getBlock(location).SetBlockTypeId(blockType.Id));
   }
 
   /// <summary>

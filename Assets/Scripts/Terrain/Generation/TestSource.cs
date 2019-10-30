@@ -1,6 +1,6 @@
-﻿using Block;
-using UnityEngine;
-
+﻿/// <summary>
+/// just some test noise
+/// </summary>
 public class TestSource : BlockSource {
 
   /// <summary>
@@ -16,12 +16,5 @@ public class TestSource : BlockSource {
       0.0f,
       1.0f
     );
-  }
-
-  /// <summary>
-  /// set up the noise type
-  /// </summary>
-  protected override void setUpNoise() {
-    //noise.SetNoiseType(Noise.FastNoise.NoiseType.Cellular);
   }
 }

@@ -1,6 +1,6 @@
-﻿using UnityEngine;
-using System.Collections;
-
+﻿/// <summary>
+/// General utilities
+/// </summary>
 public static class Utility {
 
   /// <summary>

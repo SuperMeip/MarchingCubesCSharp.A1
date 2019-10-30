@@ -29,5 +29,5 @@
   ///   bytes 3 & 4: the compresed surface density float
   /// </param>
   /// <returns>the updated block value with bitmask included</returns>
-  void updateBlock(Coordinate location, byte blockTypeId, float? densityValue = null);
+  void updateBlock(Coordinate location, Block.Type blockType, float? densityValue = null);
 }

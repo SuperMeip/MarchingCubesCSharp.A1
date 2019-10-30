@@ -667,7 +667,7 @@ public struct Coordinate {
   /// <param name="action"></param>
   /// <param name="step">the value by which the coordinate values are incrimented</param>
   public void until(Coordinate end, Action<Coordinate> action, int step = 1) {
-    Coordinate current = new Coordinate(0, 0, 0);
+    Coordinate current = (x, y, z);
     for (current.x = x; current.x < end.x; current.x += step) {
       for (current.y = y; current.y < end.y; current.y += step) {
         for (current.z = z; current.z < end.z; current.z += step) {
@@ -684,7 +684,7 @@ public struct Coordinate {
   /// <param name="action"></param>
   /// <param name="step">the value by which the coordinate values are incrimented</param>
   public void until(Coordinate end, Func<Coordinate, bool> action, int step = 1) {
-    Coordinate current = new Coordinate(0, 0, 0);
+    Coordinate current = (x, y, z);
     for (current.x = x; current.x < end.x; current.x += step) {
       for (current.y = y; current.y < end.y; current.y += step) {
         for (current.z = z; current.z < end.z; current.z += step) {
@@ -715,6 +715,10 @@ public struct Coordinate {
     return "{" + x.ToString() + ", " + y.ToString() + ", " + z.ToString() + "}";
   }
 
+  /// <summary>
+  /// Hash this coord, only works up to 256,256,256
+  /// </summary>
+  /// <returns></returns>
   public override int GetHashCode() {
     int hash = 0;
     hash |= (((byte)x) << 8);
