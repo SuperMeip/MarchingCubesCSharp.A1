@@ -520,11 +520,15 @@ public class Level<ChunkType> where ChunkType : IBlockStorage {
       protected override void jobFunction() {
         // wait until we have a resouces, or the job is canceled.
         if (resourcePool.WaitOne(-1, isCanceled)) {
-          jobHasStarted = true;
           Coordinate columnTop    = (chunkColumnLocation.x, level.chunkBounds.y, chunkColumnLocation.z);
           Coordinate columnBottom = (chunkColumnLocation.x, 0, chunkColumnLocation.z);
           columnBottom.until(columnTop, chunkLocation => {
-            doWorkOnChunk(chunkLocation);
+            if (!isCanceled) {
+              doWorkOnChunk(chunkLocation);
+              return true;
+            }
+
+            return false;
           });
 
           resourcePool.Release();

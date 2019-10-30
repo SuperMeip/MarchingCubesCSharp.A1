@@ -678,6 +678,25 @@ public struct Coordinate {
   }
 
   /// <summary>
+  /// preform the acton on all coordinates between this one and the end coordinate
+  /// </summary>
+  /// <param name="end"></param>
+  /// <param name="action"></param>
+  /// <param name="step">the value by which the coordinate values are incrimented</param>
+  public void until(Coordinate end, Func<Coordinate, bool> action, int step = 1) {
+    Coordinate current = new Coordinate(0, 0, 0);
+    for (current.x = x; current.x < end.x; current.x += step) {
+      for (current.y = y; current.y < end.y; current.y += step) {
+        for (current.z = z; current.z < end.z; current.z += step) {
+          if (!action(current)) {
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  /// <summary>
   /// Get all the points within two sets of bounds
   /// </summary>
   /// <param name="westBottomSouthBound"> the lesser bound, -,-,-</param>
