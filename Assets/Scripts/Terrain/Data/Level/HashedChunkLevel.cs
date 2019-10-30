@@ -54,6 +54,7 @@ public abstract class HashedChunkLevel<ChunkType> : Level<ChunkType> where Chunk
 
   /// <summary>
   /// Get the hash key for the chunk's location
+  /// todo: add property longHash to coordinate
   /// </summary>
   /// <returns></returns>
   long getChunkHash(Coordinate chunkLocation) {

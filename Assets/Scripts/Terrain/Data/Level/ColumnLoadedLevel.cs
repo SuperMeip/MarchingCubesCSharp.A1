@@ -308,6 +308,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
 
   /// <summary>
   /// A base job for managing chunk work queues
+  /// todo: extend from new generic queue manager job
   /// </summary>
   abstract class LevelQueueManagerJob : ThreadedJob {
 
