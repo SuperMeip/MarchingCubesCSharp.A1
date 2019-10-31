@@ -69,3 +69,4 @@ public abstract class HashedChunkLevel<ChunkType> : Level<ChunkType> where Chunk
     return hash;
   }
 }
+

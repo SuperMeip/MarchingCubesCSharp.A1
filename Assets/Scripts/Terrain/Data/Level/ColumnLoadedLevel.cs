@@ -191,7 +191,9 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
       /// <param name="chunkLocation"></param>
       /// <param name="resourcePool"></param>
       internal JGenerateChunkColumn(Level<ChunkType> level, Coordinate chunkLocation, Semaphore resourcePool)
-        : base(resourcePool, level, chunkLocation) { }
+        : base(resourcePool, level, chunkLocation) {
+        threadName = "Generate Column: " + chunkColumnLocation;
+      }
 
       /// <summary>
       /// Threaded function, loads all the block data for this chunk
@@ -216,7 +218,9 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
       /// <param name="chunkLocation"></param>
       /// <param name="resourcePool"></param>
       internal JLoadChunkColumnFromFile(Level<ChunkType> level, Coordinate chunkLocation, Semaphore resourcePool)
-        : base(resourcePool, level, chunkLocation) { }
+        : base(resourcePool, level, chunkLocation) {
+        threadName = "Load Column: " + chunkColumnLocation;
+      }
 
       /// <summary>
       /// Threaded function, loads all the block data for this chunk
@@ -240,6 +244,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
     /// <param name="level"></param>
     public JLoadChunks(Level<ChunkType> level) : base(level) {
       chunkGenerationResourcePool = new Semaphore(0, MaxChunkLoadingJobsCount);
+      threadName = "Load Chunk Manager";
     }
 
     /// <summary>
@@ -274,7 +279,9 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
       /// <param name="chunkLocation"></param>
       /// <param name="resourcePool"></param>
       internal JUnloadChunkColumn(Level<ChunkType> level, Coordinate chunkLocation, Semaphore resourcePool)
-        : base(resourcePool, level, chunkLocation) { }
+        : base(resourcePool, level, chunkLocation) {
+        threadName = "Unload Column: " + chunkColumnLocation;
+      }
 
       /// <summary>
       /// Threaded function, serializes this chunks block data and removes it from the level
@@ -289,7 +296,9 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
     /// Create a new job, linked to the level
     /// </summary>
     /// <param name="level"></param>
-    public JUnloadChunks(Level<ChunkType> level) : base(level) { }
+    public JUnloadChunks(Level<ChunkType> level) : base(level) {
+      threadName = "Unload Chunk Manager";
+    }
 
     /// <summary>
     /// Make a new unload chunk job

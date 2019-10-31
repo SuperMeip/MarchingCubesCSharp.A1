@@ -16,6 +16,11 @@ public abstract class ThreadedJob : IThreadedJob {
   protected System.Threading.Thread thread = null;
 
   /// <summary>
+  /// The name to set as the thread name on start
+  /// </summary>
+  protected string threadName = "Job";
+
+  /// <summary>
   /// if this job is done
   /// </summary>
   public bool isDone {
@@ -54,18 +59,19 @@ public abstract class ThreadedJob : IThreadedJob {
   /// <summary>
   /// if the job has finished
   /// </summary>
-  private bool _isDone = false;
+  bool _isDone = false;
 
   /// <summary>
   /// if the job is currently running
   /// </summary>
-  private bool _isRunning = false;
+  bool _isRunning = false;
 
   /// <summary>
   /// Start the job
   /// </summary>
   public void start() {
     thread = new System.Threading.Thread(run);
+    thread.Name = threadName;
     thread.Start();
   }
 

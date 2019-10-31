@@ -29,7 +29,6 @@ public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
 
     /// <summary>
     /// If this job has been cancled
-    /// </summary>
     protected bool isCanceled = false;
 
     /// <summary>
@@ -90,7 +89,7 @@ public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
   protected QueueManagerJob(int maxChildJobsCount = 10) {
     queue = new List<QueueObjectType>();
     runningChildJobs = new Dictionary<QueueObjectType, IThreadedJob>();
-    childJobResourcePool = new Semaphore(0, maxChildJobsCount);
+    childJobResourcePool = new Semaphore(maxChildJobsCount, maxChildJobsCount);
   }
 
   /// <summary>
