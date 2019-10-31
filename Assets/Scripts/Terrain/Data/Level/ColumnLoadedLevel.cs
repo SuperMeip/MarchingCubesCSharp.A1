@@ -125,14 +125,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
   /// </summary>
   /// <param name="chunkLocations">the x,z values of the chunk columns to load</param>
   protected void addChunkColumnsToLoadingQueue(Coordinate[] chunkLocations) {
-    foreach (Coordinate chunkLocation in chunkLocations) {
-      addChunkColumnToLoadingQueue(chunkLocation.xz);
-    }
-
-    // if the load queue manager job isn't running, start it
-    if (!chunkLoadQueueManagerJob.isRunning) {
-      chunkLoadQueueManagerJob.start();
-    }
+    chunkLoadQueueManagerJob.enQueue(chunkLocations);
   }
 
   /// <summary>
@@ -140,38 +133,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
   /// </summary>
   /// <param name="chunkLocations">the x,z values of the chunk columns to unload</param>
   protected void addChunkColumnsToUnloadingQueue(Coordinate[] chunkLocations) {
-    foreach (Coordinate chunkLocation in chunkLocations) {
-      addChunkColumnToUnloadingQueue(chunkLocation.xz);
-    }
-
-    // if the unload queue manager job isn't running, start it
-    if (!chunkUnloadQueueManagerJob.isRunning) {
-      chunkUnloadQueueManagerJob.start();
-    }
-  }
-
-  /// <summary>
-  /// Add the chunk to the queue of chunks to be loaded
-  /// please make sure y = 0
-  /// </summary>
-  /// <param name="chunkColumn">Make sure y = 0</param>
-  void addChunkColumnToLoadingQueue(Coordinate chunkColumn) {
-    if (!loadedChunkColumns.Contains(chunkColumn) && chunkColumn.y == 0) {
-      loadedChunkColumns.Add(chunkColumn);
-      chunkUnloadQueueManagerJob.deQueue(chunkColumn);
-      chunkLoadQueueManagerJob.enQueue(chunkColumn);
-    }
-  }
-
-  /// <summary>
-  /// Add the chunk to the queue of chunks to be unloaded
-  /// </summary>
-  /// <param name="chunkColumn">make sure y = 0</param>
-  void addChunkColumnToUnloadingQueue(Coordinate chunkColumn) {
-    if (loadedChunkColumns.Contains(chunkColumn) && chunkColumn.y == 0) {
-      chunkUnloadQueueManagerJob.enQueue(chunkColumn);
-      loadedChunkColumns.Remove(chunkColumn);
-    }
+    chunkUnloadQueueManagerJob.enQueue(chunkLocations);
   }
 
   /// <summary>

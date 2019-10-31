@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
+using UnityEngine;
 
 /// <summary>
 /// A base job for managing chunk work queues
@@ -10,6 +11,12 @@ public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
   /// An interface for a managed child queue job
   /// </summary>
   protected interface IChildQueueJob : IThreadedJob {
+
+    /// <summary>
+    /// If this job has been cancled
+    bool isCanceled {
+      get;
+    }
 
     /// <summary>
     /// cancel a job and free the resources
@@ -29,7 +36,10 @@ public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
 
     /// <summary>
     /// If this job has been cancled
-    protected bool isCanceled = false;
+    public bool isCanceled {
+      get;
+      protected set;
+    } = false;
 
     /// <summary>
     /// Make a new job
@@ -80,36 +90,53 @@ public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
   /// <summary>
   /// The dictionary containing the running child jobs
   /// </summary>
-  protected Dictionary<QueueObjectType, IThreadedJob> runningChildJobs;
+  protected Dictionary<QueueObjectType, IChildQueueJob> runningChildJobs;
+
+  /// <summary>
+  /// The max number of child jobs allowed
+  /// </summary>
+  int maxChildJobsCount;
 
   /// <summary>
   /// Create a new job, linked to the level
   /// </summary>
   /// <param name="level"></param>
   protected QueueManagerJob(int maxChildJobsCount = 10) {
-    queue = new List<QueueObjectType>();
-    runningChildJobs = new Dictionary<QueueObjectType, IThreadedJob>();
+    this.maxChildJobsCount = maxChildJobsCount;
+    runningChildJobs = new Dictionary<QueueObjectType, IChildQueueJob>();
     childJobResourcePool = new Semaphore(maxChildJobsCount, maxChildJobsCount);
   }
 
   /// <summary>
-  /// Enqueue a column of chunks for management/loading/unloading
+  /// Add a bunch of objects to the queue for processing
   /// </summary>
-  /// <param name="queueObject"></param>
-  public void enQueue(QueueObjectType queueObject) {
-    queue.Add(queueObject);
+  /// <param name="queueObjects"></param>
+  public void enQueue(QueueObjectType[] queueObjects) {
+    foreach (QueueObjectType queueObject in queueObjects) {
+      // if the chunk is already being loaded by a job, don't add it
+      if (!runningChildJobs.ContainsKey(queueObject)) {
+        IChildQueueJob chunkLoaderJob = getChildJob(queueObject);
+        runningChildJobs[queueObject] = chunkLoaderJob;
+        runningChildJobs[queueObject].start();
+      }
+    }
+
+    // if the queue manager job isn't running, start it
+    if (!isRunning) {
+      start();
+    }
   }
 
   /// <summary>
   /// if there's a child job running for the given chunks dequeue and abort it.
   /// </summary>
   /// <param name="queueObject"></param>
-  public void deQueue(QueueObjectType queueObject) {
-    queue.Remove(queueObject);
-    if (runningChildJobs.ContainsKey(queueObject)) {
-      ChildQueueJob job = (ChildQueueJob)runningChildJobs[queueObject];
-      job.cancel();
-      runningChildJobs.Remove(queueObject);
+  public void deQueue(QueueObjectType[] queueObjects) {
+    foreach (QueueObjectType queueObject in queueObjects) {
+      if (runningChildJobs.ContainsKey(queueObject)) {
+        IChildQueueJob job = runningChildJobs[queueObject];
+        job.cancel();
+      }
     }
   }
 
@@ -122,10 +149,6 @@ public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
         job.cancel();
       }
     }
-
-    // create a new load pipeline
-    runningChildJobs = new Dictionary<QueueObjectType, IThreadedJob>();
-    queue = new List<QueueObjectType>();
   }
 
   /// <summary>
@@ -138,30 +161,17 @@ public abstract class QueueManagerJob<QueueObjectType> : ThreadedJob {
   /// The threaded function to run
   /// </summary>
   protected override void jobFunction() {
-    // This job will continue until all queue'd chunks are loaded
-    while (queue.Count > 0) {
-      queue.RemoveAll((queueObject) => {
-        // if the chunk is already being loaded by a job
-        if (runningChildJobs.ContainsKey(queueObject)) {
-          IThreadedJob chunkLoaderJob = runningChildJobs[queueObject];
-
-          // if it's done, remove it from the running jobs and remove it from the queue
-          if (chunkLoaderJob.isDone) {
-            runningChildJobs.Remove(queueObject);
-            return true;
-          }
-
-          // if it's not done yet, don't remove it
-          return false;
-          // if it's not being loaded yet by a job, and we have an open spot for a new job, start and add it
-        } else {
-          IThreadedJob chunkLoaderJob = getChildJob(queueObject);
-          runningChildJobs[queueObject] = chunkLoaderJob;
-          runningChildJobs[queueObject].start();
-
-          // don't remove the running job from the queue yet
-          return false;
+    // Manage and remove finished jobs
+    List<QueueObjectType> toRemove = new List<QueueObjectType>();
+    while (runningChildJobs.Count > 0) {
+      foreach (KeyValuePair<QueueObjectType, IChildQueueJob> runningJob in runningChildJobs) {
+        if (runningJob.Value.isDone || runningJob.Value.isCanceled) {
+          toRemove.Add(runningJob.Key);
         }
+      }
+
+      toRemove.ForEach(queueObject => {
+        runningChildJobs.Remove(queueObject);
       });
     }
   }
