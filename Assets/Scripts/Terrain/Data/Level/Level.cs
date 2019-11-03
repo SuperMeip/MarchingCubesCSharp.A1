@@ -22,7 +22,7 @@ public abstract class Level<ChunkType> : ILevel<ChunkType> where ChunkType : IBl
   /// <summary>
   /// The width of the active chunk area in chunks
   /// </summary>
-  protected const int LoadedChunkDiameter = 24;
+  protected const int LoadedChunkDiameter = 1;
 
   /// <summary>
   /// The save path for levels.

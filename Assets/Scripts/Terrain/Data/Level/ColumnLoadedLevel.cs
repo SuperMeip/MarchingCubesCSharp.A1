@@ -127,6 +127,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
   /// </summary>
   /// <param name="chunkLocations">the x,z values of the chunk columns to unload</param>
   protected void addChunkColumnsToUnloadingQueue(Coordinate[] chunkLocations) {
+    chunkLoadQueueManagerJob.deQueue(chunkLocations);
     chunkUnloadQueueManagerJob.enQueue(chunkLocations);
   }
 
@@ -173,9 +174,10 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
     /// <summary>
     /// Create a new job, linked to the level
     /// </summary>
-    /// <param name="level"></param>
+    /// <param name="level"></pa
     public JLoadChunks(Level<ChunkType> level) : base(level) {
       threadName = "Load Chunk Manager";
+      chunkGenerationManagerJob = new JGenerateChunks(level);
     }
 
     /// <summary>
@@ -236,7 +238,9 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
       /// </summary>
       protected override void doWorkOnChunk(Coordinate chunkLocation) {
         if (level.getChunk(chunkLocation) == null) {
+          Debug.Log("Generating: " + chunkLocation.ToString());
           ChunkType chunkData = level.generateChunkData(chunkLocation);
+          Debug.Log("Finished: " + chunkLocation.ToString());
           level.setChunk(chunkLocation, chunkData);
         }
       }

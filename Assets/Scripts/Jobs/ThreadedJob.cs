@@ -129,4 +129,11 @@ public abstract class ThreadedJob : IThreadedJob {
       isRunning = false;
     }
   }
+
+  // abort thread on death if it's still running
+  ~ThreadedJob() {
+    if (isRunning) {
+      abort();
+    }
+  }
 }
