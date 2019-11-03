@@ -56,14 +56,14 @@ public abstract class BlockSource : IBlockSource {
   /// <summary>
   /// Generate the given set of blockdata at the given location offset
   /// </summary>
-  /// <param name="location"></param>
-  /// <param name="blockData"></param>
+  /// <param name="location">The xyz to use as an offset for generating these blocks</param>
+  /// <param name="blockData">The block data to populate</param>
   public void generateAllAt(Coordinate location, IBlockStorage blockData) {
     isoSurfaceLevel = getIsoSurfaceLevel();
-    Coordinate.Zero.until(blockData.bounds + 1, (coordinate) => {
-      Coordinate localLocation = coordinate + location;
-      float isoSurfaceDensityValue = getNoiseValueAt(localLocation);
-      blockData.updateBlock(localLocation, getBlockTypeFor(isoSurfaceDensityValue), isoSurfaceDensityValue);
+    Coordinate.Zero.until(blockData.bounds, (coordinate) => {
+      Coordinate globalLocation = coordinate + (location * blockData.bounds);
+      float isoSurfaceDensityValue = getNoiseValueAt(globalLocation);
+      blockData.updateBlock(coordinate, getBlockTypeFor(isoSurfaceDensityValue), isoSurfaceDensityValue);
     });
   }
 

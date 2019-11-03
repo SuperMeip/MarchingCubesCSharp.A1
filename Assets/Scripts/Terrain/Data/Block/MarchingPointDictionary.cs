@@ -38,7 +38,7 @@ public class MarchingPointDictionary : BlockStorage {
   }
 
   /// <summary>
-  /// Overwrite the entire block at the given location
+  /// Overwrite the entire point at the given location
   /// </summary>
   /// <param name="location">the x,y,z of the block to set</param>
   /// <param name="newBlockValue">The block data to set as a bitmask:

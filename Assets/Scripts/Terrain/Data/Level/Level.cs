@@ -12,12 +12,12 @@ public abstract class Level<ChunkType> : ILevel<ChunkType> where ChunkType : IBl
   /// <summary>
   /// The size of a block, in engine
   /// </summary>
-  const float BlockSize = 1.0f;
+  public const float BlockSize = 1.0f;
 
   /// <summary>
   /// The block diameter, x y and z, of a chunk in this level
   /// </summary>
-  const int ChunkDiameter = 64;
+  public const int ChunkDiameter = 64;
 
   /// <summary>
   /// The width of the active chunk area in chunks

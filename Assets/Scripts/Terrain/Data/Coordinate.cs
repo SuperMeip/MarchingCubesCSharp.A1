@@ -561,6 +561,14 @@ public struct Coordinate {
     );
   }
 
+  public static Coordinate operator *(Coordinate a, Coordinate b) {
+    return (
+      a.x * b.x,
+      a.y * b.y,
+      a.z * b.z
+    );
+  }
+
   public static Coordinate operator -(Coordinate a, int b) {
     return a + (-b);
   }
@@ -647,16 +655,16 @@ public struct Coordinate {
   }
 
   /// <summary>
-  /// Checks if this coordinate is within a bounds coodinate 
+  /// Checks if this coordinate is within a bounds coodinate (exclusive)
   /// </summary>
   public bool isWithin(Coordinate bounds) {
-    return x < bounds.x
-      && y < bounds.y
-      && z < bounds.z;
+    return x <= bounds.x
+      && y <= bounds.y
+      && z <= bounds.z;
   }
   
   /// <summary>
-  /// Checks if this coordinate is greater than a lower bounds coordinate
+  /// Checks if this coordinate is greater than a lower bounds coordinate (exclusive)
   /// </summary>
   public bool isBeyond(Coordinate bounds) {
     return x > bounds.x

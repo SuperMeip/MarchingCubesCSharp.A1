@@ -6,6 +6,14 @@
 public abstract class ThreadedJob : IThreadedJob {
 
   /// <summary>
+  /// The name to set as the thread name on start
+  /// </summary>
+  public string threadName {
+    get;
+    protected set;
+  } = "Job";
+
+  /// <summary>
   /// The job's handle
   /// </summary>
   private object handle = new object();
@@ -14,11 +22,6 @@ public abstract class ThreadedJob : IThreadedJob {
   /// The thread this job will run on
   /// </summary>
   protected System.Threading.Thread thread = null;
-
-  /// <summary>
-  /// The name to set as the thread name on start
-  /// </summary>
-  protected string threadName = "Job";
 
   /// <summary>
   /// if this job is done
@@ -73,6 +76,13 @@ public abstract class ThreadedJob : IThreadedJob {
     thread = new System.Threading.Thread(run);
     thread.Name = threadName;
     thread.Start();
+  }
+
+  /// <summary>
+  /// run the job thread syncronously
+  /// </summary>
+  public void task() {
+    run();
   }
 
   /// <summary>
