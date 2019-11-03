@@ -190,7 +190,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
         return false;
       }
 
-      return true;
+      return base.isAValidQueueItem(chunkColumnLocation);
     }
 
     /// <summary>
