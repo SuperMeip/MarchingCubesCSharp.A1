@@ -25,11 +25,6 @@ public interface IThreadedJob {
   void start();
 
   /// <summary>
-  /// A function to run the job syncronously, can be used as the job's 'task'
-  /// </summary>
-  void task();
-
-  /// <summary>
   /// Allows you to easily wait in a coroutine for the thread to finish. Just use:
   ///  yield return StartCoroutine(myJob.WaitFor());
   /// </summary>

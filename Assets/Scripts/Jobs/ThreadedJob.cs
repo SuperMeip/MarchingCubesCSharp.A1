@@ -79,17 +79,12 @@ public abstract class ThreadedJob : IThreadedJob {
   }
 
   /// <summary>
-  /// run the job thread syncronously
-  /// </summary>
-  public void task() {
-    run();
-  }
-
-  /// <summary>
-  /// abort this job
+  /// abort this job. 
+  /// Does NOT set done to true
   /// </summary>
   public void abort() {
     thread.Abort();
+    finallyDo();
     isRunning = false;
   }
 
@@ -115,14 +110,23 @@ public abstract class ThreadedJob : IThreadedJob {
   protected virtual void onFinished() { }
 
   /// <summary>
+  /// After a finish, or abort, do this
+  /// </summary>
+  protected virtual void finallyDo() { }
+
+  /// <summary>
   /// threaded run function
   /// </summary>
   void run() {
     isRunning = true;
-    jobFunction();
-    isDone = true;
-    // @TODO: make sure this works here:
-    onFinished();
-    isRunning = false;
+    try {
+      jobFunction();
+      // @TODO: make sure this works here:
+      onFinished();
+    } finally {
+      finallyDo();
+      isDone = true;
+      isRunning = false;
+    }
   }
 }

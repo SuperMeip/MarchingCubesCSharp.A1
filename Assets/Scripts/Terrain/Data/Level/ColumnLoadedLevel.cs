@@ -31,7 +31,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
   /// <param name="chunkBounds"></param>
   /// <param name="blockSource"></param>
   public ColumnLoadedLevel(Coordinate chunkBounds, IBlockSource blockSource) : base(chunkBounds, blockSource) {
-    chunkLoadQueueManagerJob   = new JLoadChunks(this);
+    chunkLoadQueueManagerJob = new JLoadChunks(this);
     chunkUnloadQueueManagerJob = new JUnloadChunks(this);
   }
 
@@ -136,51 +136,21 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
   class JLoadChunks : LevelQueueManagerJob {
 
     /// <summary>
-    /// A Job for generating a new column of chunks into a level
-    /// </summary>
-    class JGenerateChunkColumn : ChunkColumnLoadingJob {
-
-      /// <summary>
-      /// Make a new job
-      /// </summary>
-      /// <param name="level"></param>
-      /// <param name="chunkLocation"></param>
-      /// <param name="resourcePool"></param>
-      internal JGenerateChunkColumn(Level<ChunkType> level,
-        Coordinate chunkLocation,
-        SemaphoreSlim resourcePool,
-        CancellationTokenSource cancelSource
-      ) : base(resourcePool, level, chunkLocation, cancelSource) {
-        threadName = "Generate Column: " + chunkColumnLocation;
-      }
-
-      /// <summary>
-      /// Threaded function, loads all the block data for this chunk
-      /// </summary>
-      protected override void doWorkOnChunk(Coordinate chunkLocation) {
-        if (level.getChunk(chunkLocation) == null) {
-          ChunkType chunkData = level.generateChunkData(chunkLocation);
-          level.setChunk(chunkLocation, chunkData);
-        }
-      }
-    }
-
-    /// <summary>
     /// A Job for loading the data for a column of chunks into a level from file
     /// </summary>
     class JLoadChunkColumnFromFile : ChunkColumnLoadingJob {
 
       /// <summary>
-      /// Make a new job
+      /// Constructor
       /// </summary>
       /// <param name="level"></param>
-      /// <param name="chunkLocation"></param>
-      /// <param name="resourcePool"></param>
-      internal JLoadChunkColumnFromFile(Level<ChunkType> level,
-        Coordinate chunkLocation,
-        SemaphoreSlim resourcePool,
-        CancellationTokenSource cancelSource
-      ) : base(resourcePool, level, chunkLocation, cancelSource) {
+      /// <param name="chunkColumnLocation"></param>
+      /// <param name="parentCancellationSources"></param>
+      internal JLoadChunkColumnFromFile(
+        Level<ChunkType> level,
+        Coordinate chunkColumnLocation,
+        Dictionary<Coordinate, CancellationTokenSource> parentCancellationSources
+      ) : base(level, chunkColumnLocation, parentCancellationSources) {
         threadName = "Load Column: " + chunkColumnLocation;
       }
 
@@ -196,32 +166,101 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
     }
 
     /// <summary>
-    /// A seperate resource pool for generating chunks
+    /// The job for generating chunks from scratch
     /// </summary>
-    SemaphoreSlim chunkGenerationResourcePool;
+    JGenerateChunks chunkGenerationManagerJob;
 
     /// <summary>
     /// Create a new job, linked to the level
     /// </summary>
     /// <param name="level"></param>
     public JLoadChunks(Level<ChunkType> level) : base(level) {
-      chunkGenerationResourcePool = new SemaphoreSlim(0, MaxChunkLoadingJobsCount);
       threadName = "Load Chunk Manager";
     }
 
     /// <summary>
-    /// Make a chunk loader job
+    /// Override to shift generational items to their own queue
     /// </summary>
-    /// <param name="level"></param>
-    /// <param name="chunkLocation"></param>
+    /// <param name="chunkColumnLocation"></param>
     /// <returns></returns>
-    protected override ChildQueueJob getChildJob(Coordinate chunkLocation, CancellationTokenSource cancelSource) {
-      // create two queues for these
-      if (File.Exists(level.getChunkFileName(chunkLocation))) {
-        return new JLoadChunkColumnFromFile(level, chunkLocation, childJobResourcePool, cancelSource);
+    protected override bool isAValidQueueItem(Coordinate chunkColumnLocation) {
+      // if this doesn't have a loaded file, remove it from this queue and load it in the generation one
+      if (!File.Exists(level.getChunkFileName(chunkColumnLocation))) {
+        chunkGenerationManagerJob.enQueue(new Coordinate[] { chunkColumnLocation });
+        return false;
       }
 
-      return new JGenerateChunkColumn(level, chunkLocation, chunkGenerationResourcePool, cancelSource);
+      return true;
+    }
+
+    /// <summary>
+    /// Get the correct child job
+    /// </summary>
+    /// <param name="chunkColumnLocation"></param>
+    /// <param name="parentCancellationSources"></param>
+    /// <returns></returns>
+    protected override QueueTaskChildJob<Coordinate> getChildJob(
+       Coordinate chunkColumnLocation,
+       Dictionary<Coordinate, CancellationTokenSource> parentCancellationSources
+     ) {
+      return new JLoadChunkColumnFromFile(level, chunkColumnLocation, parentCancellationSources);
+    }
+  }
+
+  /// <summary>
+  /// A job to load all chunks from the loading queue
+  /// </summary>
+  class JGenerateChunks : LevelQueueManagerJob {
+
+    /// <summary>
+    /// A Job for generating a new column of chunks into a level
+    /// </summary>
+    class JGenerateChunkColumn : ChunkColumnLoadingJob {
+
+      /// <summary>
+      /// constructor
+      /// </summary>
+      /// <param name="level"></param>
+      /// <param name="chunkColumnLocation"></param>
+      /// <param name="parentCancellationSources"></param>
+      internal JGenerateChunkColumn(
+        Level<ChunkType> level,
+        Coordinate chunkColumnLocation,
+        Dictionary<Coordinate, CancellationTokenSource> parentCancellationSources
+      ) : base(level, chunkColumnLocation, parentCancellationSources) {
+        threadName = "Generate Column: " + chunkColumnLocation;
+      }
+
+      /// <summary>
+      /// Threaded function, loads all the block data for this chunk
+      /// </summary>
+      protected override void doWorkOnChunk(Coordinate chunkLocation) {
+        if (level.getChunk(chunkLocation) == null) {
+          ChunkType chunkData = level.generateChunkData(chunkLocation);
+          level.setChunk(chunkLocation, chunkData);
+        }
+      }
+    }
+
+    /// <summary>
+    /// Create a new job, linked to the level
+    /// </summary>
+    /// <param name="level"></param>
+    public JGenerateChunks(Level<ChunkType> level) : base(level) {
+      threadName = "Generate Chunk Manager";
+    }
+
+    /// <summary>
+    /// Get the correct child job
+    /// </summary>
+    /// <param name="chunkColumnLocation"></param>
+    /// <param name="parentCancellationSources"></param>
+    /// <returns></returns>
+    protected override QueueTaskChildJob<Coordinate> getChildJob(
+       Coordinate chunkColumnLocation,
+       Dictionary<Coordinate, CancellationTokenSource> parentCancellationSources
+     ) {
+      return new JGenerateChunkColumn(level, chunkColumnLocation, parentCancellationSources);
     }
   }
 
@@ -238,15 +277,14 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
       /// Make a new job
       /// </summary>
       /// <param name="level"></param>
-      /// <param name="chunkLocation"></param>
+      /// <param name="chunkColumnLocation"></param>
       /// <param name="resourcePool"></param>
       internal JUnloadChunkColumn(
         Level<ChunkType> level,
-        Coordinate chunkLocation,
-        SemaphoreSlim resourcePool,
-        CancellationTokenSource cancelSource
-      ) : base(resourcePool, level, chunkLocation, cancelSource) {
-        threadName = "Unload Column: " + chunkColumnLocation;
+        Coordinate chunkColumnLocation,
+        Dictionary<Coordinate, CancellationTokenSource> parentCancellationSources
+      ) : base(level, chunkColumnLocation, parentCancellationSources) {
+        threadName = "Unload Column: " + queueItem.ToString();
       }
 
       /// <summary>
@@ -267,13 +305,16 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
     }
 
     /// <summary>
-    /// Make a new unload chunk job
+    /// Get the child job
     /// </summary>
-    /// <param name="level"></param>
-    /// <param name="chunkLocation"></param>
+    /// <param name="chunkColumnLocation"></param>
+    /// <param name="parentCancellationSources"></param>
     /// <returns></returns>
-    protected override ChildQueueJob getChildJob(Coordinate chunkLocation, CancellationTokenSource cancelSource) {
-      return new JUnloadChunkColumn(level, chunkLocation, childJobResourcePool, cancelSource);
+    protected override QueueTaskChildJob<Coordinate> getChildJob(
+      Coordinate chunkColumnLocation,
+      Dictionary<Coordinate, CancellationTokenSource> parentCancellationSources
+    ) {
+      return new JUnloadChunkColumn(level, chunkColumnLocation, parentCancellationSources);
     }
   }
 
@@ -285,7 +326,7 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
     /// <summary>
     /// Base class for child jobs that manage chunk loading and unloading
     /// </summary>
-    protected abstract class ChunkColumnLoadingJob : ChildQueueJob {
+    protected abstract class ChunkColumnLoadingJob : QueueTaskChildJob<Coordinate> {
 
       /// <summary>
       /// The level we're loading for
@@ -293,23 +334,16 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
       protected Level<ChunkType> level;
 
       /// <summary>
-      /// The location of the chunk that this job is loading.
-      /// </summary>
-      protected Coordinate chunkColumnLocation;
-
-      /// <summary>
       /// Make a new job
       /// </summary>
       /// <param name="level"></param>
       /// <param name="chunkColumnLocation"></param>
       protected ChunkColumnLoadingJob(
-        SemaphoreSlim parentResourcePool,
         Level<ChunkType> level,
         Coordinate chunkColumnLocation,
-        CancellationTokenSource cancelSource
-      ) : base(parentResourcePool, cancelSource) {
+        Dictionary<Coordinate, CancellationTokenSource> parentCancellationSources
+      ) : base(chunkColumnLocation, parentCancellationSources) {
         this.level = level;
-        this.chunkColumnLocation = chunkColumnLocation;
       }
 
       /// <summary>
@@ -320,11 +354,11 @@ public class ColumnLoadedLevel<ChunkType> : HashedChunkLevel<ChunkType> where Ch
       /// <summary>
       /// Do work
       /// </summary>
-      protected override void doWork() {
+      protected override void doWork(Coordinate chunkColumnLocation, CancellationToken cancellationToken) {
         Coordinate columnTop = (chunkColumnLocation.x, level.chunkBounds.y, chunkColumnLocation.z);
         Coordinate columnBottom = (chunkColumnLocation.x, 0, chunkColumnLocation.z);
         columnBottom.until(columnTop, chunkLocation => {
-          if (!isCanceled) {
+          if (!cancellationToken.IsCancellationRequested) {
             doWorkOnChunk(chunkLocation);
             return true;
           }

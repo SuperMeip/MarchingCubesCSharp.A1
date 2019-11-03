@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading;
-using UnityEngine;
 
 /// <summary>
 /// A base job for managing chunk work queues
@@ -9,83 +7,56 @@ using UnityEngine;
 public abstract class QueueManagerJob<QueueItemType> : ThreadedJob {
 
   /// <summary>
-  /// An interface for a managed child queue job
+  /// Child job for doing work on objects in the queue
   /// </summary>
-  protected interface IChildQueueJob : IThreadedJob {
+  protected abstract class QueueTaskChildJob<ParentQueueItemType> : ThreadedJob {
 
     /// <summary>
-    /// If this job has been cancled
-    bool isCanceled {
-      get;
+    /// The queue item this job will do work on
+    /// </summary>
+    protected ParentQueueItemType queueItem;
+
+    /// <summary>
+    /// The cancelation sources for waiting jobs
+    /// </summary>
+    Dictionary<ParentQueueItemType, CancellationTokenSource> parentCancellationSources;
+
+    /// <summary>
+    /// Constructor
+    /// </summary>
+    /// <param name="queueItem"></param>
+    /// <param name="parentCancellationSources"></param>
+    internal QueueTaskChildJob(
+      ParentQueueItemType queueItem,
+      Dictionary<ParentQueueItemType, CancellationTokenSource> parentCancellationSources
+    ) {
+      this.queueItem = queueItem;
+      this.parentCancellationSources = parentCancellationSources;
     }
 
     /// <summary>
-    /// cancel a job and free the resources
+    /// The do work function
     /// </summary>
-    void cancel();
-  }
-
-  /// <summary>
-  /// Base class for child jobs that manage chunk loading and unloading
-  /// </summary>
-  protected abstract class ChildQueueJob : ThreadedJob, IChildQueueJob {
+    /// <param name="queueItem"></param>
+    /// <param name="cancellationToken"></param>
+    protected abstract void doWork(ParentQueueItemType queueItem, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The parent resource pool managing this job
-    /// </summary>
-    protected SemaphoreSlim parentResourcePool;
-
-    /// <summary>
-    /// The cancel token this job is waiting on
-    /// </summary>
-    CancellationTokenSource cancelSource;
-
-    /// <summary>
-    /// If this job has been cancled
-    public bool isCanceled {
-      get;
-      protected set;
-    } = false;
-
-    /// <summary>
-    /// Make a new job
-    /// </summary>
-    /// <param name="parentResourcePool">The parent SemaphoreSlim for resource tracking</param>
-    internal ChildQueueJob(SemaphoreSlim parentResourcePool, CancellationTokenSource cancelSource) {
-      this.parentResourcePool = parentResourcePool;
-      this.cancelSource = cancelSource;
-    }
-
-    /// <summary>
-    /// Cancel the running job, this will abort it once it succesfully releases it's resources
-    /// </summary>
-    public void cancel() {
-      isCanceled = true;
-      cancelSource.Cancel();
-    }
-
-    /// <summary>
-    /// Do the actual work on the given chunk for this type of job
-    /// </summary>
-    protected abstract void doWork();
-
-    /// <summary>
-    /// Threaded function, serializes this chunks block data and removes it from the level
+    /// Threaded function
     /// </summary>
     protected override void jobFunction() {
-      try {
-        parentResourcePool.Wait(cancelSource.Token);
-        doWork();
-      } finally {
-        parentResourcePool.Release();
+      doWork(queueItem, parentCancellationSources[queueItem].Token);
+    }
+
+    /// <summary>
+    /// On job complete, remove from parent
+    /// </summary>
+    protected override void finallyDo() {
+      if (parentCancellationSources.ContainsKey(queueItem)) {
+        parentCancellationSources.Remove(queueItem);
       }
     }
   }
-
-  /// <summary>
-  /// The resource pool for child jobs
-  /// </summary>
-  protected SemaphoreSlim childJobResourcePool;
 
   /// <summary>
   /// The queue this job is managing
@@ -98,11 +69,6 @@ public abstract class QueueManagerJob<QueueItemType> : ThreadedJob {
   protected Dictionary<QueueItemType, CancellationTokenSource> cancelationSources;
 
   /// <summary>
-  /// The dictionary containing the running child jobs
-  /// </summary>
-  protected Dictionary<QueueItemType, IChildQueueJob> runningChildJobs;
-
-  /// <summary>
   /// The max number of child jobs allowed
   /// </summary>
   int maxChildJobsCount;
@@ -113,11 +79,18 @@ public abstract class QueueManagerJob<QueueItemType> : ThreadedJob {
   /// <param name="level"></param>
   protected QueueManagerJob(int maxChildJobsCount = 10) {
     this.maxChildJobsCount = maxChildJobsCount;
-    runningChildJobs       = new Dictionary<QueueItemType, IChildQueueJob>();
     queue                  = new List<QueueItemType>();
     cancelationSources     = new Dictionary<QueueItemType, CancellationTokenSource>();
-    childJobResourcePool   = new SemaphoreSlim(maxChildJobsCount, maxChildJobsCount);
   }
+
+  /// <summary>
+  /// Get the type of job we're managing in this queue
+  /// </summary>
+  /// <returns></returns>
+  protected abstract QueueTaskChildJob<QueueItemType> getChildJob(
+    QueueItemType queueObject,
+    Dictionary<QueueItemType, CancellationTokenSource> parentCancelationSources
+  );
 
   /// <summary>
   /// Add a bunch of objects to the queue for processing
@@ -126,7 +99,7 @@ public abstract class QueueManagerJob<QueueItemType> : ThreadedJob {
   public void enQueue(QueueItemType[] queueObjects) {
     foreach (QueueItemType queueObject in queueObjects) {
       // if the chunk is already being loaded by a job, don't add it
-      if (!runningChildJobs.ContainsKey(queueObject) && !queue.Contains(queueObject)) {
+      if (!cancelationSources.ContainsKey(queueObject) && !queue.Contains(queueObject)) {
         queue.Add(queueObject);
       }
     }
@@ -138,77 +111,63 @@ public abstract class QueueManagerJob<QueueItemType> : ThreadedJob {
   }
 
   /// <summary>
-  /// if there's a child job running for the given chunks dequeue and abort it.
+  /// if there's any child jobs running for the given ojects, stop them and dequeue
   /// </summary>
   /// <param name="queueObject"></param>
   public void deQueue(QueueItemType[] queueObjects) {
     foreach (QueueItemType queueObject in queueObjects) {
-      cancelChildJobWait(queueObject);
-      if (runningChildJobs.ContainsKey(queueObject)) {
-        IChildQueueJob job = runningChildJobs[queueObject];
-        job.cancel();
+      if (queue.Contains(queueObject)) {
+        queue.Remove(queueObject);
+      }
+      if (cancelationSources.ContainsKey(queueObject)) {
+        cancelationSources[queueObject].Cancel();
       }
     }
   }
-
-  /// <summary>
-  /// Cancel any job that may be waiting to start
-  /// </summary>
-  /// <param name="queueObject"></param>
-  public void cancelChildJobWait(QueueItemType queueObject) {
-    if (cancelationSources.ContainsKey(queueObject)) {
-      cancelationSources[queueObject].Cancel();
-    }
-  }
-
-  /// <summary>
-  /// Clear all the currently running jobs
-  /// </summary>
-  public void clearRunningJobs() {
-    if (runningChildJobs.Count >= 1) {
-      foreach (ChildQueueJob job in runningChildJobs.Values) {
-        job.cancel();
-      }
-    }
-  }
-
-  /// <summary>
-  /// Get the type of job we're managing in this queue
-  /// </summary>
-  /// <returns></returns>
-  protected abstract ChildQueueJob getChildJob(QueueItemType queueObject, CancellationTokenSource cancelSource);
 
   /// <summary>
   /// The threaded function to run
   /// </summary>
   protected override void jobFunction() {
+    // run while we have a queue
     while (queue.Count > 0) {
-      queue.RemoveAll((queueObject) => {
-        // if the chunk is already being loaded by a job
-        if (runningChildJobs.ContainsKey(queueObject)) {
-          IChildQueueJob chunkLoaderJob = runningChildJobs[queueObject];
+      // validate
+      if (!isAValidQueueItem(queue[0])) {
+        queue.Remove(queue[0]);
+        continue;
+      }
 
-          // if it's done, remove it from the running jobs and remove it from the queue
-          if (chunkLoaderJob.isDone || chunkLoaderJob.isCanceled) {
-            runningChildJobs.Remove(queueObject);
-            cancelationSources.Remove(queueObject);
-            return true;
-          }
+      // if we have space, pop off the top of the queue and run it as a job.
+      if (cancelationSources.Count < maxChildJobsCount) {
+        QueueItemType queueItem = queue.Pop();
+        CancellationTokenSource cancelationToken = new CancellationTokenSource();
+        cancelationSources.Add(queueItem, cancelationToken);
+        // The child job is responsible for removing itself from the sources dictionary when done 
+        //    see QueueTaskChildJob.finallyDo()
+        getChildJob(queueItem, cancelationSources).start();
+      }
 
-          // if it's not done yet, don't remove it
-          return false;
-        // if it's not being loaded yet by a job, and we have an open spot for a new job, start and add it
-        } else {
-          CancellationTokenSource cancelSource = new CancellationTokenSource();
-          cancelationSources.Add(queueObject, cancelSource);
-          IChildQueueJob chunkLoaderJob = getChildJob(queueObject, cancelSource);
-          runningChildJobs[queueObject] = chunkLoaderJob;
-          runningChildJobs[queueObject].start();
-
-          // don't remove the running job from the queue yet
-          return false;
-        }
-      });
+      // @TODO: sort the queue here by priority
     }
+  }
+
+  /// <summary>
+  /// validate queue items
+  /// </summary>
+  /// <param name="queueItem"></param>
+  /// <returns></returns>
+  protected virtual bool isAValidQueueItem(QueueItemType queueItem) {
+    return queueItem != null;
+  }
+}
+
+/// <summary>
+/// Add pop to lists
+/// </summary>
+static class ListExtension {
+  public static T Pop<T>(this List<T> list) {
+    T r = list[0];
+    list.RemoveAt(0);
+    return r;
   }
 }
